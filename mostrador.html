@@ -215,7 +215,8 @@
         alert("Error al cargar datos. ¿La hoja es pública?");
         return;
       }
-      const cols = response.table.cols.map(c => (c.label || c.id || "").trim().toLowerCase());
+      const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase()
+);
       const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
       const indices = allowedCols.map(h => cols.indexOf(h));
       products = rows.map(r => Object.fromEntries(indices.map((i, idx) => [allowedCols[idx], r[i]])));

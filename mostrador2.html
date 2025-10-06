@@ -387,9 +387,19 @@ function renderProducts(cols, rows) {
     card.className = "product-card";
 
     // Miniatura si hay imagen
-    const imgHtml = foto
-      ? `<img src="${foto}" alt="${name}" class="mini-foto">`
-      : `<div class="mini-foto placeholder">📦</div>`;
+let imgSrc = "";
+if (foto) {
+  if (foto.includes("drive.google.com")) {
+    const idMatch = foto.match(/[-\w]{25,}/);
+    if (idMatch) imgSrc = `https://drive.google.com/uc?export=view&id=${idMatch[0]}`;
+  } else {
+    imgSrc = foto.trim();
+  }
+}
+const imgHtml = imgSrc
+  ? `<img src="${imgSrc}" alt="${name}" class="mini-foto">`
+  : `<div class="mini-foto placeholder">📦</div>`;
+
 
     // Enlace si existe
     const linkHtml = link

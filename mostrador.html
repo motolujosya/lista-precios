@@ -170,6 +170,46 @@
   }
   .summary-btn:hover, .clear-btn:hover { transform: scale(1.05); }
 
+  .cart-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.4s ease, margin 0.4s ease;
+}
+
+.cart-row:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.remove-item {
+  background: linear-gradient(90deg, #ff4d4d, #ff6a00);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.remove-item:hover {
+  transform: scale(1.1);
+}
+
+/* Animación al eliminar producto */
+.cart-row.removing {
+  opacity: 0;
+  transform: translateX(-40px);
+  margin: 0;
+}
+
+
   /* 🧾 Resumen Modal */
   #summaryModal {
     display: none;
@@ -337,18 +377,39 @@
     animateCartCount();
   }
 
-  function updateCartDisplay() {
-    cartItemsDiv.innerHTML = "";
-    let total = 0;
-    cart.forEach((item, i) => {
-      const row = document.createElement("div");
-      total += item.qty * item.price;
-      row.innerHTML = `${item.name} x${item.qty} — ${formatCurrency(item.price * item.qty)}`;
-      cartItemsDiv.appendChild(row);
+function updateCartDisplay() {
+  cartItemsDiv.innerHTML = "";
+  let total = 0;
+
+  cart.forEach((item, i) => {
+    const row = document.createElement("div");
+    row.className = "cart-row";
+    total += item.qty * item.price;
+
+    row.innerHTML = `
+      <span>${item.name} x${item.qty}</span>
+      <span>${formatCurrency(item.price * item.qty)}</span>
+      <button class="remove-item">🗑️</button>
+    `;
+
+    // Evento eliminar producto con animación
+    const removeBtn = row.querySelector(".remove-item");
+    removeBtn.addEventListener("click", () => {
+      row.classList.add("removing"); // activa animación
+      setTimeout(() => {
+        cart.splice(i, 1);
+        updateCartDisplay();
+        updateCartCount();
+      }, 400); // espera que termine la animación
     });
-    document.getElementById("cartTotal").textContent = formatCurrency(total);
-    updateCartCount();
-  }
+
+    cartItemsDiv.appendChild(row);
+  });
+
+  document.getElementById("cartTotal").textContent = formatCurrency(total);
+  updateCartCount();
+}
+
 
   function updateCartCount() {
     const count = cart.reduce((sum, i) => sum + i.qty, 0);
@@ -400,5 +461,4 @@
 
 </body>
 </html>
-
 

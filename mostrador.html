@@ -1,114 +1,167 @@
 <!doctype html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Productos desde Google Sheets (gviz)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catálogo de Productos</title>
+
+  <!-- Fuente y estilos -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    table, th, td { border:1px solid #ccc; border-collapse:collapse; padding:6px; }
-    th { background:#f4f4f4; }
-    input { margin:10px 0; padding:6px; width:320px; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      color: #007bff;
+      margin-bottom: 20px;
+    }
+    #search {
+      display: block;
+      margin: 0 auto 30px;
+      padding: 10px 15px;
+      width: 80%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      border-radius: 25px;
+      font-size: 16px;
+      outline: none;
+      transition: all 0.3s;
+    }
+    #search:focus {
+      border-color: #007bff;
+      box-shadow: 0 0 5px rgba(0,123,255,0.3);
+    }
+    #catalogo {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 15px;
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+    }
+    .nombre {
+      font-size: 18px;
+      font-weight: 700;
+      color: #007bff;
+      margin-bottom: 8px;
+      min-height: 40px;
+    }
+    .precio {
+      font-size: 16px;
+      font-weight: 600;
+      color: #28a745;
+      margin-bottom: 6px;
+    }
+    .precio-desc {
+      font-size: 14px;
+      color: #ff5722;
+      margin-bottom: 8px;
+    }
+    .info {
+      font-size: 13px;
+      color: #555;
+      background: #f1f1f1;
+      border-radius: 6px;
+      padding: 6px;
+    }
   </style>
 </head>
 <body>
-  <h2>Buscar productos mostrador</h2>
-  <input id="search" placeholder="Buscar por cualquier columna..." oninput="filterTable()">
-  <table id="productTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+
+  <h2>Catálogo de Productos</h2>
+  <input id="search" type="text" placeholder="Buscar producto o palabra clave..." oninput="filtrarCatalogo()">
+  <div id="catalogo"></div>
 
   <script>
-    // ----- CONFIGURA AQUI -----
-    const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";       // reemplaza
-    const SHEET_NAME = "Lista";   // reemplaza (nombre de la pestaña)
-    // ---------------------------
+    // Configuración
+    const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
+    const SHEET_NAME = "Lista";
 
-    // Creamos la "función global" que recibirá la respuesta gviz
+    // Configurar recepción de datos gviz
     window.google = window.google || {};
     window.google.visualization = window.google.visualization || {};
     window.google.visualization.Query = window.google.visualization.Query || {};
     window.google.visualization.Query.setResponse = function(response) {
-      // response.table.rows y response.table.cols contienen los datos
       if (!response || !response.table) {
-        console.error("Respuesta inválida gviz:", response);
+        console.error("Respuesta inválida:", response);
+        alert("No se pudieron cargar los datos. Verifica que la hoja esté pública.");
         return;
       }
+
       const cols = response.table.cols.map(c => c.label || c.id || "");
       const rows = response.table.rows.map(r => r.c.map(cell => cell ? cell.v : ""));
 
-      renderTable(cols, rows);
+      renderCatalogo(cols, rows);
     };
 
+    // Cargar los datos desde Google Sheets
     function loadGviz() {
-      // El endpoint gviz — out:json devuelve JS envuelto en google.visualization.Query.setResponse(...)
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
       const s = document.createElement('script');
       s.src = url;
-      s.onerror = function(e){ console.error("Error cargando gviz:", e); alert("No se pudo cargar la hoja. ¿Está pública?"); };
+      s.onerror = () => alert("Error cargando datos. ¿Está pública la hoja?");
       document.head.appendChild(s);
     }
 
-   
+    // Renderizar tarjetas de producto
+    function renderCatalogo(headers, rows) {
+      const allowedCols = ["producto", "precio venta", "precio max desc", "info"];
+      const normalizedHeaders = headers.map(h => h.toLowerCase().replace(/\s+/g, " ").trim());
+      const colIndex = Object.fromEntries(
+        allowedCols.map(col => [col, normalizedHeaders.indexOf(col)])
+      );
 
-function renderTable(headers, rows) {
-  console.log("Encabezados detectados:", headers);
+      const catalogo = document.getElementById("catalogo");
+      catalogo.innerHTML = "";
 
-  // 👇 Columnas que quieres mostrar (en minúsculas y sin saltos de línea)
-  const allowedCols = ["código","producto", "precio venta", "info"];
+      const formatCurrency = val => {
+        if (!val || isNaN(val)) return val;
+        return "$" + Number(val).toLocaleString("es-CO");
+      };
 
-  // Normalizamos los encabezados
-  const normalizedHeaders = headers.map(h => h.toLowerCase().replace(/\s+/g, " ").trim());
+      rows.forEach(r => {
+        const producto = r[colIndex["producto"]] || "";
+        const precio = formatCurrency(r[colIndex["precio venta"]] || "");
+        const precioDesc = formatCurrency(r[colIndex["precio max desc"]] || "");
+        const info = r[colIndex["info"]] || "";
 
-  // Buscamos los índices de las columnas visibles
-  const colIndexes = normalizedHeaders
-    .map((h, i) => allowedCols.includes(h) ? i : -1)
-    .filter(i => i !== -1);
-
-  if (colIndexes.length === 0) {
-    console.warn("No se encontró ninguna columna coincidente. Revisa los nombres.");
-  }
-
-  const thead = document.getElementById("thead");
-  const tbody = document.getElementById("tbody");
-
-  // Encabezados
-  thead.innerHTML =
-    "<tr>" + colIndexes.map(i => `<th>${escapeHtml(headers[i])}</th>`).join("") + "</tr>";
-
-  // 🔢 Función para formatear los precios
-  const formatCurrency = (val) => {
-    if (!val || isNaN(val)) return val;
-    return "$" + Number(val).toLocaleString("es-CO");
-  };
-
-  // Render de filas
-  tbody.innerHTML = rows
-    .map(r => {
-      return "<tr>" + colIndexes.map(i => {
-        let value = String(r[i] ?? "").trim();
-
-        // Detecta si el encabezado contiene "precio" → formatea como moneda
-        if (normalizedHeaders[i].includes("precio")) {
-          value = formatCurrency(value);
-        }
-
-        return `<td>${escapeHtml(value)}</td>`;
-      }).join("") + "</tr>";
-    }).join("");
-}
-
-
-
-
-    function filterTable() {
-      const q = document.getElementById("search").value.toLowerCase();
-      document.querySelectorAll("#tbody tr").forEach(tr => {
-        tr.style.display = tr.textContent.toLowerCase().includes(q) ? "" : "none";
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="nombre">${producto}</div>
+          <div class="precio">${precio}</div>
+          <div class="precio-desc">Precio máx. desc: ${precioDesc}</div>
+          <div class="info">${info}</div>
+        `;
+        catalogo.appendChild(card);
       });
     }
 
+    // Filtrado
+    function filtrarCatalogo() {
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll(".card").forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    }
 
-    function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-    // Lanzamos carga
+    // Cargar datos al iniciar
     loadGviz();
   </script>
 </body>
 </html>
+

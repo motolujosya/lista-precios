@@ -166,10 +166,13 @@ const SHEET_NAME = "Lista";
 let cart = [];
 
 /* ========== Utilidades ========== */
-function formatCurrency(n) {
-  const num = parseFloat(n) || 0;
-  return "$" + new Intl.NumberFormat('es-CO').format(num);
+function formatCurrency(num) {
+  if (!num) return "$0";
+  const n = parseFloat(num);
+  if (isNaN(n)) return "$0";
+  return "$" + Math.floor(n).toLocaleString("es-CO");
 }
+
 function toNumber(n){ return parseFloat(String(n).replace(/\./g,'').replace(',', '.')) || 0; }
 
 /* Convierte enlaces de Drive a enlace directo para <img> */

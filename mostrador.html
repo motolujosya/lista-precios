@@ -122,7 +122,244 @@
     padding: 0;
   }
   #cartPanel h3 { margin: 0; }
-  #cartClose { cursor:
+  #cartClose { cursor: pointer; font-size: 1.2em; }
+  #cartItems li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  #cartTotal { font-weight: bold; text-align: right; margin-top: 10px; }
+  #summaryBtn {
+    margin-top: 12px;
+    background: #007bff;
+    color: white;
+    width: 100%;
+  }
 
+  /* Resumen Modal */
+  #summaryModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    justify-content: center;
+    align-items: center;
+    z-index: 40;
+  }
+  #summaryBox {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+  }
+  #summaryBox table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #summaryBox th, #summaryBox td {
+    border: 1px solid #ccc;
+    padding: 6px;
+    text-align: left;
+  }
+  #summaryBox button {
+    margin-top: 10px;
+    background: #007bff;
+    color: white;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h2>Catálogo de Productos</h2>
+    <input id="search" placeholder="Buscar producto..." oninput="filterProducts()">
+  </header>
 
+  <div id="catalog" class="grid"></div>
+
+  <div id="cartButton" onclick="toggleCart()">🛒</div>
+
+  <div id="cartPanel">
+    <header>
+      <h3>Tu carrito</h3>
+      <span id="cartClose" onclick="toggleCart()">❌</span>
+    </header>
+    <ul id="cartItems"></ul>
+    <div id="cartTotal">Total: $0</div>
+    <button id="summaryBtn" onclick="showSummary()">🧾 Ver resumen</button>
+  </div>
+
+  <div id="summaryModal" onclick="closeSummary(event)">
+    <div id="summaryBox">
+      <h3>Resumen del pedido</h3>
+      <div id="summaryContent"></div>
+      <button onclick="copySummary()">📋 Copiar resumen</button>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
+    const SHEET_NAME = "Lista";
+
+    const allowedCols = ["producto", "precio venta", "precio max desc", "info"];
+    let products = [];
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+    window.google = window.google || {};
+    window.google.visualization = window.google.visualization || {};
+    window.google.visualization.Query = window.google.visualization.Query || {};
+    window.google.visualization.Query.setResponse = function(response) {
+      if (!response || !response.table) {
+        alert("Error al cargar datos. ¿La hoja es pública?");
+        return;
+      }
+      const cols = response.table.cols.map(c => (c.label || c.id || "").trim().toLowerCase());
+      const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
+      const indices = allowedCols.map(h => cols.indexOf(h));
+      products = rows.map(r => Object.fromEntries(indices.map((i, idx) => [allowedCols[idx], r[i]])));
+      renderCatalog();
+    };
+
+    function loadGviz() {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+      const s = document.createElement('script');
+      s.src = url;
+      document.head.appendChild(s);
+    }
+
+    function renderCatalog() {
+      const container = document.getElementById("catalog");
+      container.innerHTML = "";
+      products.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "card";
+        const venta = formatPrice(p["precio venta"]);
+        const desc = formatPrice(p["precio max desc"]);
+        card.innerHTML = `
+          <div class="product-name">${escapeHtml(p["producto"])}</div>
+          <div class="price-section"><span class="price-label">Venta:</span> <span class="price">${venta}</span></div>
+          <div class="price-section"><span class="price-label">Máx. desc.:</span> <span class="price">${desc}</span></div>
+          <select id="select-${escapeHtml(p["producto"])}">
+            <option value="${p["precio venta"]}">Usar precio venta</option>
+            <option value="${p["precio max desc"]}">Usar precio máx. desc.</option>
+          </select>
+          <div class="info">${escapeHtml(p["info"] || "")}</div>
+          <div class="buttons">
+            <button class="add" onclick="addToCart('${escapeHtml(p["producto"])}')">🛒 Agregar</button>
+            <button class="copy" onclick="chooseCopy('${escapeHtml(p["producto"])}', ${p["precio venta"] || 0}, ${p["precio max desc"] || 0})">📋 Copiar</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function formatPrice(value) {
+      const num = parseFloat(value || 0);
+      return num ? `$${num.toLocaleString("es-CO")}` : "$0";
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function filterProducts() {
+      const q = document.getElementById("search").value.toLowerCase();
+      document.querySelectorAll(".card").forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    }
+
+    function addToCart(name) {
+      const sel = document.getElementById(`select-${name}`);
+      const price = parseFloat(sel.value);
+      const item = cart.find(p => p.name === name && p.price === price);
+      if (item) item.qty++;
+      else cart.push({ name, price, qty: 1 });
+      updateCart();
+    }
+
+    function removeFromCart(name, price) {
+      const idx = cart.findIndex(p => p.name === name && p.price === price);
+      if (idx > -1) {
+        cart[idx].qty--;
+        if (cart[idx].qty <= 0) cart.splice(idx, 1);
+      }
+      updateCart();
+    }
+
+    function updateCart() {
+      localStorage.setItem('cart', JSON.stringify(cart));
+      const list = document.getElementById("cartItems");
+      list.innerHTML = "";
+      let total = 0;
+      cart.forEach(p => {
+        total += p.price * p.qty;
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span>${escapeHtml(p.name)} x${p.qty}</span>
+          <button class="remove" onclick="removeFromCart('${escapeHtml(p.name)}', ${p.price})">✖</button>
+        `;
+        list.appendChild(li);
+      });
+      document.getElementById("cartTotal").textContent = "Total: " + formatPrice(total);
+    }
+
+    function chooseCopy(name, venta, desc) {
+      const choice = confirm(`¿Copiar precio venta?\nCancelar = precio desc.`);
+      const chosen = choice ? venta : desc;
+      copyText(`${name} - ${formatPrice(chosen)}`);
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text);
+      alert("Copiado: " + text);
+    }
+
+    function toggleCart() {
+      document.getElementById("cartPanel").classList.toggle("open");
+    }
+
+    function showSummary() {
+      const modal = document.getElementById("summaryModal");
+      const content = document.getElementById("summaryContent");
+      if (cart.length === 0) {
+        content.innerHTML = "<p>No hay productos en el carrito.</p>";
+      } else {
+        let html = "<table><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th></tr>";
+        let total = 0;
+        cart.forEach(p => {
+          const subt = p.qty * p.price;
+          total += subt;
+          html += `<tr><td>${escapeHtml(p.name)}</td><td>${p.qty}</td><td>${formatPrice(p.price)}</td><td>${formatPrice(subt)}</td></tr>`;
+        });
+        html += `<tr><td colspan="3" style="text-align:right"><b>Total</b></td><td><b>${formatPrice(total)}</b></td></tr></table>`;
+        content.innerHTML = html;
+      }
+      modal.style.display = "flex";
+    }
+
+    function copySummary() {
+      let text = "🧾 Pedido:\n";
+      let total = 0;
+      cart.forEach(p => {
+        const subt = p.qty * p.price;
+        total += subt;
+        text += `- ${p.name} x${p.qty} — ${formatPrice(subt)}\n`;
+      });
+      text += `TOTAL: ${formatPrice(total)}`;
+      navigator.clipboard.writeText(text);
+      alert("Resumen copiado al portapapeles ✅");
+    }
+
+    function closeSummary(e) {
+      if (e.target.id === "summaryModal") e.target.style.display = "none";
+    }
+
+    loadGviz();
+    updateCart();
+  </script>
+</body>
+</html>
 

@@ -357,6 +357,25 @@
   s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
   document.head.appendChild(s);
 
+  // 🖼️ Función global para convertir enlaces de Google Drive a imagen visible
+function getDriveThumbnail(url) {
+  if (!url) return "";
+  url = url.trim();
+
+  // Buscar ID de archivo en formato /d/ID/ o id=ID
+  const match = url.match(/\/d\/([-\w]{25,})/i) || url.match(/[?&]id=([-\w]{25,})/i);
+  const id = match ? (match[1] || match[2]) : "";
+
+  if (id) {
+    return `https://drive.google.com/uc?export=view&id=${id}`;
+  }
+
+  // Si no hay ID y parece una URL directa, usarla tal cual
+  if (url.startsWith("http")) return url;
+
+  return "";
+}
+
 function renderProducts(cols, rows) {
   const grid = document.getElementById("productGrid");
   grid.innerHTML = "";
@@ -384,24 +403,7 @@ function renderProducts(cols, rows) {
     if (!name) return;
 
    
-// 🖼️ Función global para convertir enlaces de Google Drive a imagen visible
-function getDriveThumbnail(url) {
-  if (!url) return "";
-  url = url.trim();
 
-  // Buscar ID de archivo en formato /d/ID/ o id=ID
-  const match = url.match(/\/d\/([-\w]{25,})/i) || url.match(/[?&]id=([-\w]{25,})/i);
-  const id = match ? (match[1] || match[2]) : "";
-
-  if (id) {
-    return `https://drive.google.com/uc?export=view&id=${id}`;
-  }
-
-  // Si no hay ID y parece una URL directa, usarla tal cual
-  if (url.startsWith("http")) return url;
-
-  return "";
-}
 
 const card = document.createElement("div");
 card.className = "product-card";

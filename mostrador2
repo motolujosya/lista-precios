@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Catálogo - Tienda</title>
+<style>
+  :root{
+    --primary:#ff6b00;   /* naranja vivo */
+    --accent:#00b894;    /* verde boton */
+    --muted:#6c757d;
+    --card:#ffffff;
+    --bg: linear-gradient(180deg,#fff9f2 0%, #f6fbf9 100%);
+    --shadow: 0 8px 20px rgba(2,6,23,0.08);
+    --badge-bg: #ff3b30;
+  }
+
+  html,body{height:100%;margin:0;font-family:Inter, "Segoe UI", Roboto, Arial, sans-serif;background:var(--bg);color:#222;}
+  header{background:linear-gradient(90deg,var(--primary),#ff8a42); color:white;padding:18px 12px 28px;text-align:center;position:sticky;top:0;z-index:50;box-shadow:0 4px 10px rgba(0,0,0,0.06);}
+  header h1{margin:0;font-size:20px;letter-spacing:0.2px;}
+  #search{margin:12px auto 0;padding:10px 14px;width:92%;max-width:520px;border-radius:999px;border:0;box-shadow:0 6px 18px rgba(0,0,0,0.08);font-size:15px;outline:none;}
+  
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;padding:20px;max-width:1200px;margin:20px auto;}
+  .card{background:var(--card);border-radius:14px;padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:space-between;transition:transform .15s ease,box-shadow .15s;}
+  .card:hover{transform:translateY(-6px);box-shadow:0 18px 36px rgba(2,6,23,0.08);}
+  .product-name{font-weight:700;color:#1b1b1b;margin-bottom:6px;font-size:1rem;}
+  .price-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;}
+  .price {background:linear-gradient(90deg,#e0fff0,#d6fff6); padding:6px 8px;border-radius:8px;color:var(--accent);font-weight:700;}
+  .price-desc {background:linear-gradient(90deg,#fff2e6,#fff4ec);padding:6px 8px;border-radius:8px;color:var(--primary);font-weight:700;}
+  .info{font-size:13px;color:var(--muted);background:#fbfbfb;padding:8px;border-radius:8px;margin-bottom:10px;}
+  .controls{display:flex;gap:8px;align-items:center;justify-content:space-between;}
+  .left-controls{flex:1}
+  .btn{padding:8px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:600;transition:transform .12s ease,opacity .12s;display:inline-flex;align-items:center;gap:8px}
+  .btn:active{transform:scale(.98)}
+  .btn.add{background:var(--accent);color:white}
+  .btn.copy{background:#0ea5b8;color:white}
+  .select-price{width:100%;margin:8px 0;padding:8px;border-radius:8px;border:1px solid #eee;font-weight:600;background:white}
+  .small{font-size:13px;color:#444}
+
+  /* Cart floating button + badge */
+  #cartButton{
+    position:fixed;right:18px;bottom:18px;background:linear-gradient(180deg,#fff,#fff);border-radius:999px;padding:12px 14px;box-shadow:0 12px 30px rgba(0,0,0,0.12);cursor:pointer;z-index:120;display:flex;align-items:center;gap:10px;
+  }
+  #cartIcon{font-size:20px;color:var(--primary);font-weight:800}
+  #cartBadge{min-width:20px;height:20px;background:var(--badge-bg);color:white;border-radius:999px;display:inline-flex;justify-content:center;align-items:center;padding:0 6px;font-size:12px;font-weight:700;transform-origin:center;transition:transform .18s cubic-bezier(.2,.9,.3,1);}
+  
+  /* Cart panel */
+  #cartPanel{position:fixed;right:0;top:0;height:100%;width:360px;background:white;box-shadow:-20px 0 60px rgba(0,0,0,0.08);transform:translateX(110%);transition:transform .28s ease;z-index:140;padding:18px;display:flex;flex-direction:column;gap:8px}
+  #cartPanel.open{transform:translateX(0)}
+  #cartPanel header{display:flex;justify-content:space-between;align-items:center}
+  #cartPanel h3{margin:0;font-size:18px;color:#222}
+  .close-cart{background:#f1f1f3;border-radius:8px;border:0;padding:8px 10px;cursor:pointer;font-weight:700;color:#333}
+  #cartItems{list-style:none;padding:0;margin:8px 0;flex:1;overflow:auto}
+  .cart-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #eee}
+  .cart-item .title{font-weight:600}
+  .cart-item .qty{color:var(--muted);font-size:13px}
+  .cart-actions{display:flex;gap:6px}
+  .cart-remove{background:#ff6b6b;border:0;color:white;padding:6px 8px;border-radius:8px;cursor:pointer}
+  #cartTotal{font-size:16px;font-weight:800;text-align:right;color:#111;margin-top:6px}
+
+  #summaryBtn{background:var(--primary);color:white;border:0;padding:10px;border-radius:8px;cursor:pointer;font-weight:700}
+
+  /* summary modal */
+  #summaryModal{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:200}
+  #summaryBox{background:white;border-radius:12px;padding:18px;max-width:680px;width:92%;max-height:80vh;overflow:auto}
+  #summaryBox table{width:100%;border-collapse:collapse;margin-top:8px}
+  #summaryBox th, #summaryBox td{border:1px solid #eee;padding:8px;text-align:left}
+  #summaryClose{background:#f1f1f3;border:0;padding:8px 10px;border-radius:8px;cursor:pointer;margin-top:12px}
+
+  /* small transient toasts */
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:110px;background:#111;color:white;padding:10px 14px;border-radius:999px;opacity:0;pointer-events:none;z-index:250;transition:opacity .22s,transform .22s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+  
+  /* quick animations */
+  .pulse{animation:pulse .45s cubic-bezier(.2,.9,.3,1)}
+  @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+  .pop{animation:pop .28s cubic-bezier(.2,.9,.3,1)}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Catálogo • MotoLujos</h1>
+    <input id="search" placeholder="Buscar producto o info..." oninput="filterProducts()" />
+  </header>
+
+  <main>
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <!-- cart floating -->
+  <div id="cartButton" onclick="toggleCart()" title="Ver carrito">
+    <div id="cartIcon">🛒</div>
+    <div id="cartBadge">0</div>
+  </div>
+
+  <!-- cart side panel -->
+  <aside id="cartPanel" aria-hidden="true">
+    <header>
+      <h3>Tu carrito</h3>
+      <button class="close-cart" onclick="toggleCart()">Cerrar</button>
+    </header>
+
+    <ul id="cartItems"></ul>
+
+    <div id="cartTotal">Total: $0</div>
+    <button id="summaryBtn" onclick="showSummary()">🧾 Ver resumen</button>
+  </aside>
+
+  <!-- summary modal -->
+  <div id="summaryModal" onclick="if(event.target===this) closeSummary()">
+    <div id="summaryBox" role="dialog" aria-modal="true">
+      <h3>Resumen del pedido</h3>
+      <div id="summaryContent"></div>
+      <button onclick="copySummary()">📋 Copiar resumen</button>
+      <button id="summaryClose" onclick="closeSummary()">Cerrar</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+/* ========== CONFIG ========== */
+const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
+const SHEET_NAME = "Lista";
+
+/* columnas que usaremos (se normalizan internamente) */
+const allowedCols = ["producto","precio venta","precio max desc","info"];
+
+/* estado */
+let products = []; // {id, producto, precio venta, precio max desc, info}
+let cart = JSON.parse(localStorage.getItem('cart')||'[]'); // [{id, name, price, qty}]
+
+/* ========== UTIL ========== */
+function normalizeHeader(h){
+  return String(h||"").trim().replace(/\s+/g," ").toLowerCase();
+}
+function formatPrice(value){
+  const n = parseFloat(String(value||"").toString().replace(/\$|,/g,""));
+  return n ? "$" + n.toLocaleString("es-CO") : "$0";
+}
+function toNumber(value){ const n=parseFloat(String(value||"").toString().replace(/\$|,/g,"")); return isNaN(n)?0:n; }
+function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* toast */
+function showToast(msg, time=900){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), time);
+}
+
+/* pulse badge animation */
+function pillPulse(){
+  const b = document.getElementById('cartBadge');
+  b.classList.add('pulse');
+  setTimeout(()=>b.classList.remove('pulse'),300);
+}
+
+/* pop animation for copy button - uses class on element */
+function popEl(el){
+  if(!el) return;
+  el.classList.add('pop');
+  setTimeout(()=>el.classList.remove('pop'),280);
+}
+
+/* ========== GVIZ LOAD ========== */
+window.google = window.google || {};
+window.google.visualization = window.google.visualization || {};
+window.google.visualization.Query = window.google.visualization.Query || {};
+window.google.visualization.Query.setResponse = function(response){
+  if(!response || !response.table){ alert("No se pudieron cargar datos. Verifica permisos de la hoja."); return; }
+  const rawCols = response.table.cols.map(c => (c.label||c.id||""));
+  const cols = rawCols.map(normalizeHeader);
+  const rows = response.table.rows.map(r => r.c.map(cell => cell?cell.v:""));
+
+  // obtener índices según allowedCols
+  const idxMap = allowedCols.map(c=>cols.indexOf(c));
+  products = rows.map((r,i)=>({
+    id: 'p'+i,
+    producto: r[idxMap[0]]||"",
+    precioVentaRaw: r[idxMap[1]]||"",
+    precioDescRaw: r[idxMap[2]]||"",
+    info: r[idxMap[3]]||""
+  }));
+  renderGrid();
+};
+
+function loadGviz(){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+  const s = document.createElement('script');
+  s.src = url;
+  s.onerror = ()=>alert("Error cargando Google Sheets. ¿Está pública?");
+  document.head.appendChild(s);
+}
+
+/* ========== RENDER GRID (cards) ========== */
+function renderGrid(){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  products.forEach((p, idx)=>{
+    const ventaNum = toNumber(p.precioVentaRaw);
+    const descNum = toNumber(p.precioDescRaw);
+    const venta = formatPrice(ventaNum);
+    const desc = formatPrice(descNum);
+
+    // card
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.pindex = idx;
+
+    // safe id for select and copy menu
+    const selId = `sel-${p.id}`;
+
+    card.innerHTML = `
+      <div>
+        <div class="product-name">${escapeHtml(p.producto)}</div>
+        <div class="price-row">
+          <div class="price small">Venta: ${venta}</div>
+          <div class="price-desc small">Máx.desc: ${desc}</div>
+        </div>
+        <select id="${selId}" class="select-price small">
+          <option value="${ventaNum}">Usar Precio Venta (${venta})</option>
+          <option value="${descNum}">Usar Precio Máx.Desc (${desc})</option>
+        </select>
+        <div class="info">${escapeHtml(p.info || '')}</div>
+      </div>
+
+      <div class="controls">
+        <div class="left-controls">
+          <button class="btn add" onclick="handleAdd('${p.id}', ${idx}, this)">➕ Agregar</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:110px">
+          <button class="btn copy" onclick="openCopyMenu(event, ${idx})">📋 Copiar</button>
+        </div>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+/* ========== FILTER ========== */
+function filterProducts(){
+  const q = (document.getElementById('search').value||'').toLowerCase().trim();
+  document.querySelectorAll('.card').forEach(card=>{
+    const ok = card.textContent.toLowerCase().includes(q);
+    card.style.display = ok ? '' : 'none';
+  });
+}
+
+/* ========== CART FUNCTIONS ========== */
+function getCartCount(){
+  return cart.reduce((s,i)=>s + (i.qty||0), 0);
+}
+function updateCartUI(){
+  // badge
+  const badge = document.getElementById('cartBadge');
+  const count = getCartCount();
+  badge.textContent = count;
+  pillPulse();
+
+  // items list
+  const ul = document.getElementById('cartItems');
+  ul.innerHTML = '';
+  let total = 0;
+  cart.forEach((it,idx)=>{
+    const li = document.createElement('li');
+    li.className = 'cart-item';
+    const totalLine = it.qty * it.price;
+    total += totalLine;
+    li.innerHTML = `
+      <div>
+        <div class="title">${escapeHtml(it.name)}</div>
+        <div class="qty small">${it.qty} x ${formatPrice(it.price)}</div>
+      </div>
+      <div class="cart-actions">
+        <button class="cart-remove" onclick="removeFromCart(${idx})">−</button>
+      </div>
+    `;
+    ul.appendChild(li);
+  });
+  document.getElementById('cartTotal').textContent = 'Total: ' + formatPrice(total);
+  localStorage.setItem('cart', JSON.stringify(cart));
+}
+
+/* agregar (usa select en la tarjeta) */
+function handleAdd(pid, pindex, btnEl){
+  // animate button quick
+  popEl(btnEl);
+  const sel = document.getElementById(`sel-${pid}`);
+  const price = toNumber(sel?sel.value:0);
+  const name = products[pindex].producto || ('Producto '+pindex);
+
+  // find same item (same name + price)
+  const found = cart.find(x=> x.name===name && x.price===price);
+  if(found) found.qty++;
+  else cart.push({name, price, qty:1});
+
+  updateCartUI();
+  showToast('Agregado al carrito ✅',900);
+}
+
+/* remove by index (decrement qty) */
+function removeFromCart(index){
+  if(index<0 || index>=cart.length) return;
+  cart[index].qty--;
+  if(cart[index].qty<=0) cart.splice(index,1);
+  updateCartUI();
+}
+
+/* toggle side cart */
+function toggleCart(){
+  const panel = document.getElementById('cartPanel');
+  panel.classList.toggle('open');
+  panel.setAttribute('aria-hidden', !panel.classList.contains('open'));
+}
+
+/* ========== COPY MENU (choose which price) ========== */
+let currentCopyMenu = null;
+function openCopyMenu(ev, pindex){
+  // close previous
+  if(currentCopyMenu){ currentCopyMenu.remove(); currentCopyMenu=null; }
+
+  const p = products[pindex];
+  const venta = toNumber(p.precioVentaRaw);
+  const desc = toNumber(p.precioDescRaw);
+
+  const menu = document.createElement('div');
+  menu.style.position='absolute';
+  menu.style.zIndex=9999;
+  menu.style.background='white';
+  menu.style.boxShadow='0 10px 24px rgba(0,0,0,0.12)';
+  menu.style.borderRadius='8px';
+  menu.style.padding='6px';
+  menu.style.minWidth='220px';
+  menu.style.fontSize='14px';
+  menu.style.left = (ev.clientX - 110) + 'px';
+  menu.style.top = (ev.clientY + 8) + 'px';
+
+  menu.innerHTML = `
+    <div style="padding:8px 10px; font-weight:700;">Copiar precio</div>
+    <div style="display:flex;flex-direction:column;gap:6px;padding:8px">
+      <button style="padding:8px;border-radius:8px;border:0;background:var(--accent);color:white;font-weight:700" onclick="copySelectedPrice(${pindex}, ${venta})">Precio venta • ${formatPrice(venta)}</button>
+      <button style="padding:8px;border-radius:8px;border:0;background:var(--primary);color:white;font-weight:700" onclick="copySelectedPrice(${pindex}, ${desc})">Precio máx.desc • ${formatPrice(desc)}</button>
+    </div>
+    <div style="text-align:right;padding:6px"><button onclick="closeCopyMenu()" style="background:#f1f1f3;border:0;padding:6px 8px;border-radius:6px;cursor:pointer">Cerrar</button></div>
+  `;
+
+  document.body.appendChild(menu);
+  currentCopyMenu = menu;
+
+  // close when clicking outside
+  setTimeout(()=> {
+    document.addEventListener('click', docClickCopyMenu);
+  },10);
+  ev.stopPropagation();
+}
+function docClickCopyMenu(e){
+  if(currentCopyMenu && !currentCopyMenu.contains(e.target)){
+    closeCopyMenu();
+  }
+}
+function closeCopyMenu(){
+  if(currentCopyMenu){ currentCopyMenu.remove(); currentCopyMenu=null; document.removeEventListener('click', docClickCopyMenu); }
+}
+function copySelectedPrice(pindex, price){
+  const name = products[pindex].producto || '';
+  const text = `${name} - ${formatPrice(price)}`;
+  navigator.clipboard.writeText(text).then(()=> {
+    showToast('Precio copiado ✅',900);
+    closeCopyMenu();
+  }, ()=>{
+    alert('No se pudo copiar');
+  });
+}
+
+/* ========== SUMMARY (modal) ========== */
+function showSummary(){
+  const modal = document.getElementById('summaryModal');
+  const content = document.getElementById('summaryContent');
+  if(cart.length===0){ content.innerHTML = '<p>No hay productos en el carrito.</p>'; }
+  else {
+    let total = 0;
+    let html = '<table><thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead><tbody>';
+    cart.forEach(it=>{
+      const sub = it.qty * it.price; total += sub;
+      html += `<tr><td>${escapeHtml(it.name)}</td><td>${it.qty}</td><td>${formatPrice(it.price)}</td><td>${formatPrice(sub)}</td></tr>`;
+    });
+    html += `<tr><td colspan="3" style="text-align:right;font-weight:800">TOTAL</td><td style="font-weight:800">${formatPrice(total)}</td></tr>`;
+    html += '</tbody></table>';
+    content.innerHTML = html;
+  }
+  modal.style.display = 'flex';
+}
+function closeSummary(){
+  document.getElementById('summaryModal').style.display = 'none';
+}
+/* copy summary text (human friendly) */
+function copySummary(){
+  if(cart.length===0){ showToast('Carrito vacío',900); return; }
+  let text = '🧾 Pedido:\n';
+  let total=0;
+  cart.forEach(it=>{
+    const subt = it.qty * it.price; total += subt;
+    text += `- ${it.name} x${it.qty} — ${formatPrice(subt)}\n`;
+  });
+  text += `TOTAL: ${formatPrice(total)}`;
+  navigator.clipboard.writeText(text).then(()=> {
+    showToast('Resumen copiado ✅',900);
+  }, ()=> alert('No se pudo copiar'));
+}
+
+/* ========== INIT ========== */
+function bootstrap(){
+  loadGviz();
+  updateCartUI();
+}
+bootstrap();
+
+/* close copy menu if ESC pressed */
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeCopyMenu(); closeSummary(); const p=document.getElementById('cartPanel'); if(p && p.classList.contains('open')) p.classList.remove('open'); }});
+</script>
+</body>
+</html>

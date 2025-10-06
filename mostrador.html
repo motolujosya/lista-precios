@@ -1,366 +1,404 @@
 <!doctype html>
-<html lang="es">
+<html>
 <head>
 <meta charset="utf-8">
-<title>Catálogo de Productos</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo Tienda</title>
 <style>
   body {
-    font-family: Arial, sans-serif;
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #f8f9fa, #e0f7fa);
     margin: 0;
-    background: #f8f9fa;
-  }
-  header {
-    background: #007bff;
-    color: white;
-    text-align: center;
-    padding: 1rem;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  #search {
-    margin: 10px auto;
-    display: block;
-    padding: 8px;
-    width: 90%;
-    max-width: 400px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 15px;
-    padding: 15px;
-  }
-  .card {
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: transform 0.2s;
-  }
-  .card:hover { transform: translateY(-3px); }
-  .product-name {
-    font-weight: bold;
-    font-size: 1.1em;
-    color: #333;
-  }
-  .price-section {
-    margin: 6px 0;
-    font-size: 0.9em;
-  }
-  .price-label { color: #666; }
-  .price { color: #007bff; font-weight: bold; }
-  .info { color: #555; font-size: 0.85em; margin-bottom: 8px; }
-  .buttons {
-    display: flex;
-    justify-content: space-between;
-    gap: 6px;
-  }
-  button {
-    flex: 1;
-    padding: 6px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: background 0.2s;
-  }
-  button.add { background: #28a745; color: white; }
-  button.add:hover { background: #218838; }
-  button.copy { background: #17a2b8; color: white; }
-  button.copy:hover { background: #138496; }
-  button.remove { background: #dc3545; color: white; }
-  button.remove:hover { background: #c82333; }
-  select {
-    margin-top: 6px;
-    padding: 4px;
-    width: 100%;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-  }
-
-  /* Carrito flotante */
-  #cartButton {
-    position: fixed;
-    top: 15px;
-    right: 15px;
-    background: #ffc107;
-    color: #333;
-    padding: 10px 14px;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    z-index: 20;
-  }
-  #cartPanel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    background: white;
-    width: 320px;
-    height: 100%;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.3);
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    padding: 15px;
-    overflow-y: auto;
-    z-index: 30;
-  }
-  #cartPanel.open { transform: translateX(0); }
-  #cartPanel header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: none;
-    color: #333;
     padding: 0;
   }
-  #cartPanel h3 { margin: 0; }
-  #cartClose { cursor: pointer; font-size: 1.2em; }
-  #cartItems li {
+
+  h2 {
+    text-align: center;
+    margin: 20px 0;
+    color: #007bff;
+  }
+
+  #search {
+    display: block;
+    margin: 10px auto;
+    padding: 8px;
+    width: 80%;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .product-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    padding: 14px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .product-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+
+  .product-card h4 {
+    color: #333;
+    margin: 0 0 6px 0;
+  }
+
+  .product-card p {
+    margin: 4px 0;
+  }
+
+  .product-card select, .product-card button {
+    margin-top: 6px;
+  }
+
+  .add-btn {
+    background: linear-gradient(90deg, #00b09b, #96c93d);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .add-btn:hover { transform: scale(1.05); }
+
+  .copy-btn {
+    background: linear-gradient(90deg, #007bff, #00c6ff);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  /* 🛒 Carrito */
+  #cartIcon {
+    position: fixed;
+    top: 15px;
+    right: 20px;
+    background: linear-gradient(90deg, #ff7a18, #ffb347);
+    padding: 12px;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    font-size: 22px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    z-index: 999;
+  }
+
+  #cartCount {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: red;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 50%;
+    animation: pop 0.3s ease;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.5); }
+    100% { transform: scale(1); }
+  }
+
+  .cart-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 340px;
+    background: #fff;
+    box-shadow: -3px 0 10px rgba(0,0,0,0.2);
+    padding: 15px;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+  }
+  .cart-panel.open { transform: translateX(0); }
+
+  .cart-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
-  }
-  #cartTotal { font-weight: bold; text-align: right; margin-top: 10px; }
-  #summaryBtn {
-    margin-top: 12px;
-    background: #007bff;
-    color: white;
-    width: 100%;
+    margin-bottom: 12px;
   }
 
-  /* Resumen Modal */
+  .close-cart {
+    background: linear-gradient(90deg, #ff4d4d, #ff6a00);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .cart-total {
+    font-weight: bold;
+    margin-top: 10px;
+  }
+
+  .cart-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+  }
+
+  .summary-btn, .clear-btn {
+    border: none;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #fff;
+  }
+  .summary-btn {
+    background: linear-gradient(90deg, #007bff, #00c6ff);
+  }
+  .clear-btn {
+    background: linear-gradient(90deg, #ff4d4d, #ff6a00);
+  }
+  .summary-btn:hover, .clear-btn:hover { transform: scale(1.05); }
+
+  /* 🧾 Resumen Modal */
   #summaryModal {
     display: none;
     position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    justify-content: center;
-    align-items: center;
-    z-index: 40;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    justify-content: center; align-items: center;
+    z-index: 2000;
   }
-  #summaryBox {
-    background: white;
+  #summaryContent {
+    background: #fff;
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 12px;
     width: 90%;
     max-width: 500px;
+    animation: fadeIn 0.3s ease;
   }
-  #summaryBox table {
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  #summaryTable {
     width: 100%;
     border-collapse: collapse;
+    margin-bottom: 12px;
   }
-  #summaryBox th, #summaryBox td {
-    border: 1px solid #ccc;
+  #summaryTable th, #summaryTable td {
+    border: 1px solid #ddd;
     padding: 6px;
     text-align: left;
   }
-  #summaryBox button {
-    margin-top: 10px;
-    background: #007bff;
-    color: white;
-    width: 100%;
+  #summaryButtons {
+    text-align: right;
   }
+  #summaryButtons button {
+    margin-left: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+  }
+  .copy-summary { background: #007bff; }
+  .close-summary { background: #ff4d4d; }
 </style>
 </head>
 <body>
-  <header>
-    <h2>Catálogo de Productos</h2>
-    <input id="search" placeholder="Buscar producto..." oninput="filterProducts()">
-  </header>
 
-  <div id="catalog" class="grid"></div>
+<h2>🛍️ Catálogo de productos</h2>
+<input id="search" placeholder="Buscar por nombre o info..." oninput="filterProducts()">
+<div id="cartIcon">🛒<span id="cartCount">0</span></div>
 
-  <div id="cartButton" onclick="toggleCart()">🛒</div>
+<div class="product-grid" id="productGrid"></div>
 
-  <div id="cartPanel">
-    <header>
-      <h3>Tu carrito</h3>
-      <span id="cartClose" onclick="toggleCart()">❌</span>
-    </header>
-    <ul id="cartItems"></ul>
-    <div id="cartTotal">Total: $0</div>
-    <button id="summaryBtn" onclick="showSummary()">🧾 Ver resumen</button>
+<!-- 🛒 Panel Carrito -->
+<div id="cartPanel" class="cart-panel">
+  <div class="cart-header">
+    <h3>🛍️ Tu carrito</h3>
+    <button id="closeCartBtn" class="close-cart">Cerrar</button>
   </div>
+  <div id="cartItems"></div>
+  <div class="cart-total">
+    <strong>Total:</strong> <span id="cartTotal">$0</span>
+  </div>
+  <div class="cart-actions">
+    <button id="viewSummaryBtn" class="summary-btn">🧾 Ver resumen</button>
+    <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar carrito</button>
+  </div>
+</div>
 
-  <div id="summaryModal" onclick="closeSummary(event)">
-    <div id="summaryBox">
-      <h3>Resumen del pedido</h3>
-      <div id="summaryContent"></div>
-      <button onclick="copySummary()">📋 Copiar resumen</button>
+<!-- 🧾 Modal Resumen -->
+<div id="summaryModal">
+  <div id="summaryContent">
+    <h3>Resumen del pedido</h3>
+    <table id="summaryTable"></table>
+    <div id="summaryButtons">
+      <button class="copy-summary" id="copySummaryBtn">Copiar</button>
+      <button class="close-summary" id="closeSummaryBtn">Cerrar</button>
     </div>
   </div>
+</div>
 
-  <script>
-    const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
-    const SHEET_NAME = "Lista";
+<script>
+  const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
+  const SHEET_NAME = "Lista";
+  let cart = [];
 
-    const allowedCols = ["producto", "precio venta", "precio max desc", "info"];
-    let products = [];
-    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+  // --- Cargar productos desde Google Sheets ---
+  window.google = window.google || {};
+  window.google.visualization = window.google.visualization || {};
+  window.google.visualization.Query = window.google.visualization.Query || {};
+  window.google.visualization.Query.setResponse = function(response) {
+    if (!response || !response.table) return alert("Error cargando datos");
+    const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase());
+    const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
+    renderProducts(cols, rows);
+  };
+  const s = document.createElement('script');
+  s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+  document.head.appendChild(s);
 
-    window.google = window.google || {};
-    window.google.visualization = window.google.visualization || {};
-    window.google.visualization.Query = window.google.visualization.Query || {};
-    window.google.visualization.Query.setResponse = function(response) {
-      if (!response || !response.table) {
-        alert("Error al cargar datos. ¿La hoja es pública?");
-        return;
-      }
-      const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase()
-);
-      const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
-      const indices = allowedCols.map(h => cols.indexOf(h));
-      products = rows.map(r => Object.fromEntries(indices.map((i, idx) => [allowedCols[idx], r[i]])));
-      renderCatalog();
-    };
+  function renderProducts(cols, rows) {
+    const grid = document.getElementById("productGrid");
+    grid.innerHTML = "";
+    rows.forEach(r => {
+      const obj = {};
+      cols.forEach((c, i) => obj[c] = r[i]);
+      const name = obj["producto"];
+      const price = obj["precio venta"];
+      const priceDesc = obj["precio max desc"];
+      const info = obj["info"];
+      if (!name) return;
+      const card = document.createElement("div");
+      card.className = "product-card";
+      card.innerHTML = `
+        <h4>${name}</h4>
+        <p>${info || ""}</p>
+        <select>
+          <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
+          <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
+        </select><br>
+        <button class="add-btn">Agregar</button>
+        <button class="copy-btn">Copiar</button>
+      `;
+      card.querySelector(".add-btn").onclick = e => addToCart(name, card.querySelector("select").value);
+      card.querySelector(".copy-btn").onclick = e => {
+        const val = card.querySelector("select").value;
+        navigator.clipboard.writeText(`${name} - ${formatCurrency(val)}`);
+        card.querySelector(".copy-btn").textContent = "✅ Copiado";
+        setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
+      };
+      grid.appendChild(card);
+    });
+  }
 
-    function loadGviz() {
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
-      const s = document.createElement('script');
-      s.src = url;
-      document.head.appendChild(s);
+  function formatCurrency(num) {
+    if (!num) return "$0";
+    return "$" + parseFloat(num).toLocaleString("es-CO");
+  }
+
+  function filterProducts() {
+    const q = document.getElementById("search").value.toLowerCase();
+    document.querySelectorAll(".product-card").forEach(c => {
+      c.style.display = c.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  }
+
+  // --- Carrito ---
+  const cartIcon = document.getElementById("cartIcon");
+  const cartCount = document.getElementById("cartCount");
+  const cartPanel = document.getElementById("cartPanel");
+  const cartItemsDiv = document.getElementById("cartItems");
+
+  cartIcon.onclick = () => cartPanel.classList.toggle("open");
+  document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
+
+  function addToCart(name, price) {
+    const existing = cart.find(p => p.name === name && p.price === price);
+    if (existing) existing.qty++;
+    else cart.push({ name, price, qty: 1 });
+    updateCartDisplay();
+    animateCartCount();
+  }
+
+  function updateCartDisplay() {
+    cartItemsDiv.innerHTML = "";
+    let total = 0;
+    cart.forEach((item, i) => {
+      const row = document.createElement("div");
+      total += item.qty * item.price;
+      row.innerHTML = `${item.name} x${item.qty} — ${formatCurrency(item.price * item.qty)}`;
+      cartItemsDiv.appendChild(row);
+    });
+    document.getElementById("cartTotal").textContent = formatCurrency(total);
+    updateCartCount();
+  }
+
+  function updateCartCount() {
+    const count = cart.reduce((sum, i) => sum + i.qty, 0);
+    cartCount.textContent = count;
+  }
+
+  function animateCartCount() {
+    cartCount.style.animation = "none";
+    cartCount.offsetHeight; // reset animation
+    cartCount.style.animation = "pop 0.3s ease";
+  }
+
+  // Vaciar carrito
+  document.getElementById("clearCartBtn").onclick = () => {
+    if (cart.length === 0) return alert("El carrito ya está vacío.");
+    if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
+      cart = [];
+      updateCartDisplay();
+      alert("Carrito vaciado correctamente.");
     }
+  };
 
-    function renderCatalog() {
-      const container = document.getElementById("catalog");
-      container.innerHTML = "";
-      products.forEach(p => {
-        const card = document.createElement("div");
-        card.className = "card";
-        const venta = formatPrice(p["precio venta"]);
-        const desc = formatPrice(p["precio max desc"]);
-        card.innerHTML = `
-          <div class="product-name">${escapeHtml(p["producto"])}</div>
-          <div class="price-section"><span class="price-label">Venta:</span> <span class="price">${venta}</span></div>
-          <div class="price-section"><span class="price-label">Máx. desc.:</span> <span class="price">${desc}</span></div>
-          <select id="select-${escapeHtml(p["producto"])}">
-            <option value="${p["precio venta"]}">Usar precio venta</option>
-            <option value="${p["precio max desc"]}">Usar precio máx. desc.</option>
-          </select>
-          <div class="info">${escapeHtml(p["info"] || "")}</div>
-          <div class="buttons">
-            <button class="add" onclick="addToCart('${escapeHtml(p["producto"])}')">🛒 Agregar</button>
-            <button class="copy" onclick="chooseCopy('${escapeHtml(p["producto"])}', ${p["precio venta"] || 0}, ${p["precio max desc"] || 0})">📋 Copiar</button>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
+  // --- Ver resumen ---
+  document.getElementById("viewSummaryBtn").onclick = () => {
+    const table = document.getElementById("summaryTable");
+    table.innerHTML = "<tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr>";
+    let total = 0;
+    cart.forEach(i => {
+      total += i.qty * i.price;
+      table.innerHTML += `<tr><td>${i.name}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
+    });
+    table.innerHTML += `<tr><th colspan=2>Total</th><th>${formatCurrency(total)}</th></tr>`;
+    document.getElementById("summaryModal").style.display = "flex";
+  };
 
-    function formatPrice(value) {
-      const num = parseFloat(value || 0);
-      return num ? `$${num.toLocaleString("es-CO")}` : "$0";
-    }
+  document.getElementById("closeSummaryBtn").onclick = () => {
+    document.getElementById("summaryModal").style.display = "none";
+  };
 
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
+  document.getElementById("copySummaryBtn").onclick = () => {
+    let text = "🧾 Resumen del pedido:\n";
+    cart.forEach(i => text += `- ${i.name} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
+    const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+    text += `TOTAL: ${formatCurrency(total)}`;
+    navigator.clipboard.writeText(text);
+    alert("Resumen copiado al portapapeles ✅");
+  };
+</script>
 
-    function filterProducts() {
-      const q = document.getElementById("search").value.toLowerCase();
-      document.querySelectorAll(".card").forEach(card => {
-        card.style.display = card.textContent.toLowerCase().includes(q) ? "" : "none";
-      });
-    }
-
-    function addToCart(name) {
-      const sel = document.getElementById(`select-${name}`);
-      const price = parseFloat(sel.value);
-      const item = cart.find(p => p.name === name && p.price === price);
-      if (item) item.qty++;
-      else cart.push({ name, price, qty: 1 });
-      updateCart();
-    }
-
-    function removeFromCart(name, price) {
-      const idx = cart.findIndex(p => p.name === name && p.price === price);
-      if (idx > -1) {
-        cart[idx].qty--;
-        if (cart[idx].qty <= 0) cart.splice(idx, 1);
-      }
-      updateCart();
-    }
-
-    function updateCart() {
-      localStorage.setItem('cart', JSON.stringify(cart));
-      const list = document.getElementById("cartItems");
-      list.innerHTML = "";
-      let total = 0;
-      cart.forEach(p => {
-        total += p.price * p.qty;
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <span>${escapeHtml(p.name)} x${p.qty}</span>
-          <button class="remove" onclick="removeFromCart('${escapeHtml(p.name)}', ${p.price})">✖</button>
-        `;
-        list.appendChild(li);
-      });
-      document.getElementById("cartTotal").textContent = "Total: " + formatPrice(total);
-    }
-
-    function chooseCopy(name, venta, desc) {
-      const choice = confirm(`¿Copiar precio venta?\nCancelar = precio desc.`);
-      const chosen = choice ? venta : desc;
-      copyText(`${name} - ${formatPrice(chosen)}`);
-    }
-
-    function copyText(text) {
-      navigator.clipboard.writeText(text);
-      alert("Copiado: " + text);
-    }
-
-    function toggleCart() {
-      document.getElementById("cartPanel").classList.toggle("open");
-    }
-
-    function showSummary() {
-      const modal = document.getElementById("summaryModal");
-      const content = document.getElementById("summaryContent");
-      if (cart.length === 0) {
-        content.innerHTML = "<p>No hay productos en el carrito.</p>";
-      } else {
-        let html = "<table><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th></tr>";
-        let total = 0;
-        cart.forEach(p => {
-          const subt = p.qty * p.price;
-          total += subt;
-          html += `<tr><td>${escapeHtml(p.name)}</td><td>${p.qty}</td><td>${formatPrice(p.price)}</td><td>${formatPrice(subt)}</td></tr>`;
-        });
-        html += `<tr><td colspan="3" style="text-align:right"><b>Total</b></td><td><b>${formatPrice(total)}</b></td></tr></table>`;
-        content.innerHTML = html;
-      }
-      modal.style.display = "flex";
-    }
-
-    function copySummary() {
-      let text = "🧾 Pedido:\n";
-      let total = 0;
-      cart.forEach(p => {
-        const subt = p.qty * p.price;
-        total += subt;
-        text += `- ${p.name} x${p.qty} — ${formatPrice(subt)}\n`;
-      });
-      text += `TOTAL: ${formatPrice(total)}`;
-      navigator.clipboard.writeText(text);
-      alert("Resumen copiado al portapapeles ✅");
-    }
-
-    function closeSummary(e) {
-      if (e.target.id === "summaryModal") e.target.style.display = "none";
-    }
-
-    loadGviz();
-    updateCart();
-  </script>
 </body>
 </html>
+
 

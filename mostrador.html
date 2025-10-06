@@ -209,6 +209,49 @@
   margin: 0;
 }
 
+.mini-foto {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+}
+.mini-foto:hover {
+  transform: scale(1.05);
+}
+
+.mini-foto.placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f2f2f2;
+  color: #888;
+  font-size: 28px;
+}
+
+.link-btn {
+  background: linear-gradient(90deg, #00b09b, #96c93d);
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 13px;
+  transition: transform 0.2s;
+}
+.link-btn:hover {
+  transform: scale(1.05);
+}
+
+.card-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+
 
   /* 🧾 Resumen Modal */
   #summaryModal {
@@ -314,39 +357,95 @@
   s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
   document.head.appendChild(s);
 
-  function renderProducts(cols, rows) {
-    const grid = document.getElementById("productGrid");
-    grid.innerHTML = "";
-    rows.forEach(r => {
-      const obj = {};
-      cols.forEach((c, i) => obj[c] = r[i]);
-      const name = obj["producto"];
-      const price = obj["precio venta"];
-      const priceDesc = obj["precio max desc"];
-      const info = obj["info"];
-      if (!name) return;
-      const card = document.createElement("div");
-      card.className = "product-card";
-      card.innerHTML = `
-        <h4>${name}</h4>
-        <p>${info || ""}</p>
-        <select>
-          <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
-          <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
-        </select><br>
-        <button class="add-btn">Agregar</button>
-        <button class="copy-btn">Copiar</button>
-      `;
-      card.querySelector(".add-btn").onclick = e => addToCart(name, card.querySelector("select").value);
-      card.querySelector(".copy-btn").onclick = e => {
-        const val = card.querySelector("select").value;
-        navigator.clipboard.writeText(`${name} - ${formatCurrency(val)}`);
-        card.querySelector(".copy-btn").textContent = "✅ Copiado";
-        setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
-      };
-      grid.appendChild(card);
-    });
+  // 🖼️ Función global para convertir enlaces de Google Drive a imagen visible
+function getDriveThumbnail(url) {
+  if (!url) return "";
+  url = url.trim();
+
+  // Si ya es una imagen directa
+  if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) return url;
+
+  // Si es un enlace típico de Drive (con /d/ o id=)
+  let idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
   }
+
+  return "";
+}
+
+
+
+
+function renderProducts(cols, rows) {
+  const grid = document.getElementById("productGrid");
+  grid.innerHTML = "";
+
+  // 1️⃣ Ordenar por nombre de producto (columna "producto")
+  rows.sort((a, b) => {
+    const iProd = cols.indexOf("producto");
+    const nameA = (a[iProd] || "").toString().toLowerCase();
+    const nameB = (b[iProd] || "").toString().toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  // 2️⃣ Crear tarjetas con imagen y link
+  rows.forEach(r => {
+    const obj = {};
+    cols.forEach((c, i) => obj[c] = r[i]);
+
+    const name = obj["producto"];
+    const price = obj["precio venta"];
+    const priceDesc = obj["precio max desc"];
+    const info = obj["info"];
+    const foto = obj["foto"];
+    const link = obj["links"];
+
+    if (!name) return;
+
+   
+
+
+const card = document.createElement("div");
+card.className = "product-card";
+
+// 🖼️ Intentar mostrar miniatura del producto
+const imgSrc = getDriveThumbnail(foto);
+const imgHtml = imgSrc
+  ? `<img src="${imgSrc}" alt="${name}" class="mini-foto">`
+  : `<div class="mini-foto placeholder">📦</div>`;
+
+
+
+
+    card.innerHTML = `
+  ${imgHtml}
+  <h4>${name}</h4>
+  <p>${info || ""}</p>
+  <select>
+    <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
+    <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
+  </select><br>
+  <button class="add-btn">Agregar</button>
+  <button class="copy-btn">Copiar</button>
+  ${link ? `<p><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
+`;
+
+
+    // --- Eventos de los botones ---
+    card.querySelector(".add-btn").onclick = e => addToCart(name, card.querySelector("select").value);
+
+    card.querySelector(".copy-btn").onclick = e => {
+      const val = card.querySelector("select").value;
+      navigator.clipboard.writeText(`${name} - ${formatCurrency(val)}`);
+      card.querySelector(".copy-btn").textContent = "✅ Copiado";
+      setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
+    };
+
+    grid.appendChild(card);
+  });
+}
+
 
   function formatCurrency(num) {
     if (!num) return "$0";

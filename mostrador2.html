@@ -383,6 +383,29 @@ function renderProducts(cols, rows) {
 
     if (!name) return;
 
+    // 🖼️ Función que convierte enlaces de Google Drive a formato visible
+function getDriveThumbnail(url) {
+  if (!url) return "";
+  url = url.trim();
+
+  // Detectar ID de Drive (formato /file/d/ID/ o id=ID)
+  const match = url.match(/\/d\/([-\w]{25,})|id=([-\w]{25,})/);
+  const id = match ? (match[1] || match[2]) : "";
+
+  // Si se encuentra ID, devolver el enlace correcto
+  if (id) {
+    return `https://drive.google.com/uc?export=view&id=${id}`;
+  }
+
+  // Si no hay ID y es un enlace válido (ej: https://example.com/img.jpg)
+  if (url.startsWith("http")) {
+    return url;
+  }
+
+  return "";
+}
+
+    
     const card = document.createElement("div");
     card.className = "product-card";
 
@@ -410,32 +433,26 @@ function parseDriveImageUrl(url) {
 }
 
 // Dentro del render (reemplaza tu bloque anterior de foto):
-const imgSrc = parseDriveImageUrl(foto);
+const imgSrc = getDriveThumbnail(obj["foto"]);
 const imgHtml = imgSrc
   ? `<img src="${imgSrc}" alt="${name}" class="mini-foto">`
   : `<div class="mini-foto placeholder">📦</div>`;
 
 
 
-    // Enlace si existe
-    const linkHtml = link
-      ? `<a href="${link}" target="_blank" class="link-btn">🔗 Ver</a>`
-      : "";
-
     card.innerHTML = `
-      ${imgHtml}
-      <h4>${name}</h4>
-      <p>${info || ""}</p>
-      <select>
-        <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
-        <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
-      </select><br>
-      <div class="card-buttons">
-        <button class="add-btn">Agregar</button>
-        <button class="copy-btn">Copiar</button>
-        ${linkHtml}
-      </div>
-    `;
+  ${imgHtml}
+  <h4>${name}</h4>
+  <p>${info || ""}</p>
+  <select>
+    <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
+    <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
+  </select><br>
+  <button class="add-btn">Agregar</button>
+  <button class="copy-btn">Copiar</button>
+  ${link ? `<p><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
+`;
+
 
     // --- Eventos de los botones ---
     card.querySelector(".add-btn").onclick = e => addToCart(name, card.querySelector("select").value);

@@ -166,12 +166,10 @@ const SHEET_NAME = "Lista";
 let cart = [];
 
 /* ========== Utilidades ========== */
-function formatCurrency(num) {
-  if (!num) return "$0";
-  const n = parseFloat(num);
-  if (isNaN(n)) return "$0";
-  return "$" + Math.floor(n).toLocaleString("es-CO");
-}
+  function formatCurrency(num) {
+    if (!num) return "$0";
+    return "$" + parseFloat(num).toLocaleString("es-CO");
+  }
 
 function toNumber(n){ return parseFloat(String(n).replace(/\./g,'').replace(',', '.')) || 0; }
 

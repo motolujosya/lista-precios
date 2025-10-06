@@ -166,12 +166,17 @@ const SHEET_NAME = "Lista";
 let cart = [];
 
 /* ========== Utilidades ========== */
-  function formatCurrency(num) {
-    if (!num) return "$0";
-    return "$" + parseFloat(num).toLocaleString("es-CO");
-  }
+function formatCurrency(num) {
+  if (!num) return "$0";
+  const clean = String(num).replace(/[^\d.-]/g, ""); // elimina símbolos
+  const n = Math.floor(parseFloat(clean) || 0); // redondea hacia abajo, sin decimales
+  return "$" + n.toLocaleString("es-CO");
+}
 
-function toNumber(n){ return parseFloat(String(n).replace(/\./g,'').replace(',', '.')) || 0; }
+function toNumber(n) {
+  const clean = String(n).replace(/[^\d.-]/g, "");
+  return Math.floor(parseFloat(clean) || 0);
+}
 
 /* Convierte enlaces de Drive a enlace directo para <img> */
 function getDriveThumbnail(url) {

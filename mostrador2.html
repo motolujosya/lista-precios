@@ -126,6 +126,28 @@
   }
   .cart-panel.open { transform: translateX(0); }
 
+  /* 🔽 Scroll dentro del carrito cuando hay muchos productos */
+#cartItems {
+  max-height: calc(100vh - 180px); /* Altura ajustable según tu diseño */
+  overflow-y: auto;
+  padding-right: 6px; /* evita que el scroll tape contenido */
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+
+/* Scrollbar estética (para navegadores basados en WebKit) */
+#cartItems::-webkit-scrollbar {
+  width: 6px;
+}
+#cartItems::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+#cartItems::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+  
   .cart-header {
     display: flex;
     justify-content: space-between;

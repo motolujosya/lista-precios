@@ -170,6 +170,39 @@
   }
   .summary-btn:hover, .clear-btn:hover { transform: scale(1.05); }
 
+  .cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.cart-item:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.remove-item-btn {
+  background: linear-gradient(90deg, #ff4d4d, #ff6a00);
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.remove-item-btn:hover {
+  transform: scale(1.1);
+}
+
+
   /* 🧾 Resumen Modal */
   #summaryModal {
     display: none;
@@ -338,17 +371,43 @@
   }
 
   function updateCartDisplay() {
-    cartItemsDiv.innerHTML = "";
-    let total = 0;
-    cart.forEach((item, i) => {
-      const row = document.createElement("div");
-      total += item.qty * item.price;
-      row.innerHTML = `${item.name} x${item.qty} — ${formatCurrency(item.price * item.qty)}`;
-      cartItemsDiv.appendChild(row);
-    });
-    document.getElementById("cartTotal").textContent = formatCurrency(total);
-    updateCartCount();
+  const cartItemsContainer = document.getElementById("cartItems");
+  cartItemsContainer.innerHTML = "";
+
+  if (cart.length === 0) {
+    cartItemsContainer.innerHTML = "<p style='text-align:center; color:#888;'>Tu carrito está vacío</p>";
+    document.getElementById("cartTotal").textContent = "$0";
+    return;
   }
+
+  let total = 0;
+
+  cart.forEach((item, index) => {
+    const productDiv = document.createElement("div");
+    productDiv.className = "cart-item";
+    productDiv.innerHTML = `
+      <div class="cart-item-info">
+        <strong>${item.PRODUCTO}</strong>
+        <p>Código: ${item.Código}</p>
+        <p>Precio: ${formatCurrency(item.precio)}</p>
+      </div>
+      <button class="remove-item-btn" title="Eliminar este producto">🗑️</button>
+    `;
+
+    // Evento para eliminar este producto
+    productDiv.querySelector(".remove-item-btn").addEventListener("click", () => {
+      cart.splice(index, 1);
+      updateCartDisplay();
+      updateCartCount();
+      alert("Producto eliminado del carrito.");
+    });
+
+    cartItemsContainer.appendChild(productDiv);
+    total += item.precio;
+  });
+
+  document.getElementById("cartTotal").textContent = formatCurrency(total);
+}
 
   function updateCartCount() {
     const count = cart.reduce((sum, i) => sum + i.qty, 0);

@@ -382,19 +382,19 @@
   // 🖼️ Función global para convertir enlaces de Google Drive a imagen visible
 function getDriveThumbnail(url) {
   if (!url) return "";
-  url = url.trim();
+  url = String(url).trim();
 
-  // Si ya es una imagen directa
-  if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) return url;
-
-  // Si es un enlace típico de Drive (con /d/ o id=)
-  let idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-  if (idMatch && idMatch[1]) {
-    return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+  // Extraer ID de los distintos formatos posibles
+  const match = url.match(/[-\w]{25,}/);
+  if (match && match[0]) {
+    return `https://drive.google.com/uc?export=view&id=${match[0]}`;
   }
 
+  // Si ya es un enlace directo (por ejemplo de otro servidor)
+  if (url.startsWith("http")) return url;
   return "";
 }
+
 
 
 

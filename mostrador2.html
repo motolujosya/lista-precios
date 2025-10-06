@@ -362,15 +362,16 @@ function getDriveThumbnail(url) {
   if (!url) return "";
   url = url.trim();
 
-  // 🔍 Detectar el ID de cualquier formato de enlace de Google Drive
+  // Extrae el ID de cualquier tipo de enlace de Google Drive
   const idMatch = url.match(/[-\w]{25,}/);
   if (idMatch) {
     return `https://drive.google.com/uc?export=view&id=${idMatch[0]}`;
   }
 
-  // Si no es de Drive, devolver la URL original
+  // Si no es un enlace de Drive, devuelve la URL original
   return url.startsWith("http") ? url : "";
 }
+
 
 
 function renderProducts(cols, rows) {

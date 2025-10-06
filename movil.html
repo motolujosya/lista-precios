@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Catálogo Tienda (Móvil)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #f8f9fa, #e0f7fa);
+    margin: 0;
+    padding: 0;
+  }
+
+  h2 {
+    text-align: center;
+    margin: 16px 0;
+    color: #007bff;
+    font-size: 1.5em;
+  }
+
+  #search {
+    display: block;
+    margin: 10px auto;
+    padding: 10px;
+    width: 85%;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    font-size: 1em;
+  }
+
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .product-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    padding: 14px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .product-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+
+  .product-card h4 {
+    color: #333;
+    margin: 6px 0;
+  }
+
+  .product-card p {
+    margin: 4px 0;
+    font-size: 0.9em;
+  }
+
+  .product-card select {
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px;
+    border-radius: 8px;
+  }
+
+  .add-btn, .copy-btn {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    width: 48%;
+  }
+
+  .add-btn {
+    background: linear-gradient(90deg, #00b09b, #96c93d);
+  }
+
+  .copy-btn {
+    background: linear-gradient(90deg, #007bff, #00c6ff);
+  }
+
+  .card-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+
+  .mini-foto {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  /* 🛒 Carrito */
+  #cartIcon {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: linear-gradient(90deg, #ff7a18, #ffb347);
+    padding: 14px;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    font-size: 24px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    z-index: 999;
+  }
+
+  #cartCount {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: red;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 50%;
+    animation: pop 0.3s ease;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+
+  .cart-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 85%;
+    background: #fff;
+    box-shadow: 0 -3px 12px rgba(0,0,0,0.2);
+    border-radius: 20px 20px 0 0;
+    padding: 16px;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+  }
+  .cart-panel.open { transform: translateY(0); }
+
+  .cart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .close-cart {
+    background: linear-gradient(90deg, #ff4d4d, #ff6a00);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .cart-row {
+    display: flex;
+    justify-content: space-between;
+    background: #fafafa;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+
+  .cart-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+
+  .summary-btn, .clear-btn {
+    flex: 1;
+    margin: 0 4px;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.9em;
+  }
+
+  .summary-btn { background: linear-gradient(90deg, #007bff, #00c6ff); }
+  .clear-btn { background: linear-gradient(90deg, #ff4d4d, #ff6a00); }
+
+  /* 📱 Responsive - móviles */
+  @media (max-width: 600px) {
+    .product-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .product-card {
+      padding: 10px;
+    }
+    .add-btn, .copy-btn {
+      font-size: 0.85em;
+      padding: 6px;
+    }
+    .mini-foto {
+      height: 120px;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .product-grid {
+      grid-template-columns: 1fr;
+    }
+    .product-card {
+      width: 90%;
+      margin: 0 auto;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h2>🛍️ Catálogo de productos</h2>
+<input id="search" placeholder="Buscar productos...">
+
+<div id="cartIcon">🛒<span id="cartCount">0</span></div>
+<div class="product-grid" id="productGrid"></div>
+
+<div id="cartPanel" class="cart-panel">
+  <div class="cart-header">
+    <h3>Tu carrito</h3>
+    <button id="closeCartBtn" class="close-cart">Cerrar</button>
+  </div>
+  <div id="cartItems"></div>
+  <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+  <div class="cart-actions">
+    <button class="summary-btn">🧾 Resumen</button>
+    <button class="clear-btn">🗑️ Vaciar</button>
+  </div>
+</div>
+
+<script>
+// --- JS simplificado solo visual (puedes mantener tu lógica original completa aquí) ---
+document.getElementById("cartIcon").onclick = () => {
+  document.getElementById("cartPanel").classList.toggle("open");
+};
+document.getElementById("closeCartBtn").onclick = () => {
+  document.getElementById("cartPanel").classList.remove("open");
+};
+</script>
+
+</body>
+</html>

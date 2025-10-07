@@ -380,7 +380,26 @@
   document.head.appendChild(s);
 
 
+// Convierte un enlace de GitHub a raw para <img>
+function githubRaw(url) {
+  if (!url) return "";
 
+  try {
+    // Solo URLs de GitHub
+    const ghMatch = url.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/);
+    if (ghMatch) {
+      const user = ghMatch[1];
+      const repo = ghMatch[2];
+      const branch = ghMatch[3];
+      const path = ghMatch[4];
+      return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
+    }
+    // Si ya es raw o no es GitHub, devuelve tal cual
+    return url;
+  } catch (e) {
+    return url;
+  }
+}
 
 
 function renderProducts(cols, rows) {
@@ -417,8 +436,9 @@ card.className = "product-card";
 
 // 🖼️ Intentar mostrar miniatura del producto
 const imgHtml = foto
-  ? `<img src="${foto}" alt="${name}" class="mini-foto">`
+  ? `<img src="${githubRaw(foto)}" alt="${name}" class="mini-foto">`
   : `<div class="mini-foto placeholder">📦</div>`;
+
 
 
 

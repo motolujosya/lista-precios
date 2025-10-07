@@ -232,13 +232,14 @@
 }
 
 .mini-foto {
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
+  max-width: 150px;
+  max-height: 100px;
+  width: auto;
+  height: auto;
+  object-fit: contain; /* mantiene la proporción completa */
   border-radius: 10px;
   margin-bottom: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  transition: transform 0.2s;
 }
 .mini-foto:hover {
   transform: scale(1.05);
@@ -379,23 +380,26 @@
   s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
   document.head.appendChild(s);
 
-  // 🖼️ Función global para convertir enlaces de Google Drive a imagen visible
-function getDriveThumbnail(url) {
+// Convierte un enlace de GitHub a raw para <img>
+function githubRaw(url) {
   if (!url) return "";
-  url = url.trim();
 
-  // Si ya es una imagen directa
-  if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) return url;
-
-  // Si es un enlace típico de Drive (con /d/ o id=)
-  let idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-  if (idMatch && idMatch[1]) {
-    return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+  try {
+    // Solo URLs de GitHub
+    const ghMatch = url.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/);
+    if (ghMatch) {
+      const user = ghMatch[1];
+      const repo = ghMatch[2];
+      const branch = ghMatch[3];
+      const path = ghMatch[4];
+      return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
+    }
+    // Si ya es raw o no es GitHub, devuelve tal cual
+    return url;
+  } catch (e) {
+    return url;
   }
-
-  return "";
 }
-
 
 
 
@@ -432,9 +436,8 @@ const card = document.createElement("div");
 card.className = "product-card";
 
 // 🖼️ Intentar mostrar miniatura del producto
-const imgSrc = getDriveThumbnail(foto);
-const imgHtml = imgSrc
-  ? `<img src="${imgSrc}" alt="${name}" class="mini-foto">`
+const imgHtml = foto
+  ? `<img src="${githubRaw(foto)}" alt="${name}" class="mini-foto">`
   : `<div class="mini-foto placeholder">📦</div>`;
 
 

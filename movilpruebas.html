@@ -35,7 +35,16 @@
   }
   .product-card:hover { transform:translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,0.12); }
 
-  .mini-foto { width:100%; height:140px; object-fit:cover; border-radius:10px; margin-bottom:8px; }
+  .mini-foto {
+  width: 180px;     /* ancho fijo */
+  height: 120px;    /* altura fija */
+  object-fit: cover; 
+  border-radius: 10px; 
+  margin-bottom: 8px; 
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
   .mini-foto.placeholder { height:120px; display:flex; align-items:center; justify-content:center; font-size:28px; color:#888; background:#f2f2f2; }
 
   .product-card h4 { margin:6px 0; font-size:1rem; color:#222; }
@@ -178,18 +187,20 @@ function toNumber(n) {
   return Math.floor(parseFloat(clean) || 0);
 }
 
-/* Convierte enlaces de Drive a enlace directo para <img> */
-function getDriveThumbnail(url) {
+// Convierte enlaces de GitHub con /blob/ a raw para <img>
+function githubRaw(url) {
   if (!url) return "";
-  url = String(url).trim();
-  // buscar /d/ID o id=ID
-  const m1 = url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
-  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
-  const m3 = url.match(/[-\w]{25,}/); // fallback buscar secuencia larga
-  const id = (m1 && m1[1]) || (m2 && m2[1]) || (m3 && m3[0]);
-  if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
-  if (url.startsWith('http')) return url;
-  return "";
+  try {
+    const ghMatch = url.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/);
+    if (ghMatch) {
+      const user = ghMatch[1];
+      const repo = ghMatch[2];
+      const branch = ghMatch[3];
+      const path = ghMatch[4];
+      return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
+    }
+    return url; // si ya es raw o no es GitHub
+  } catch(e){ return url; }
 }
 
 /* ========== Render productos (desde gviz) ========== */
@@ -238,7 +249,8 @@ function renderProducts(cols, rows) {
     const foto = obj['foto'] || obj['imagen'] || "";
     const link = obj['links'] || obj['link'] || "";
 
-    const imgSrc = getDriveThumbnail(foto);
+    const imgSrc = githubRaw(foto); // ahora usa GitHub raw
+
     const imgHtml = imgSrc ? `<img class="mini-foto" src="${imgSrc}" alt="${name}">` : `<div class="mini-foto placeholder">📦</div>`;
 
     const card = document.createElement('div');

@@ -35,15 +35,15 @@
   }
   .product-card:hover { transform:translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,0.12); }
 
-  .mini-foto {
-  width: 180px;     /* ancho fijo */
-  height: 120px;    /* altura fija */
-  object-fit: cover; 
-  border-radius: 10px; 
-  margin-bottom: 8px; 
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
+.mini-foto {
+  max-width: 150px;
+  max-height: 100px;
+  width: auto;
+  height: auto;
+  object-fit: contain; /* mantiene la proporción completa */
+  border-radius: 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
   .mini-foto.placeholder { height:120px; display:flex; align-items:center; justify-content:center; font-size:28px; color:#888; background:#f2f2f2; }
 

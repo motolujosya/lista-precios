@@ -379,22 +379,6 @@
   s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
   document.head.appendChild(s);
 
-  // 🖼️ Función global para convertir enlaces de Google Drive a imagen visible
-function getDriveThumbnail(url) {
-  if (!url) return "";
-  url = String(url).trim();
-
-  // Extraer ID de los distintos formatos posibles
-  const match = url.match(/[-\w]{25,}/);
-  if (match && match[0]) {
-    return `https://drive.google.com/uc?export=view&id=${match[0]}`;
-  }
-
-  // Si ya es un enlace directo (por ejemplo de otro servidor)
-  if (url.startsWith("http")) return url;
-  return "";
-}
-
 
 
 
@@ -432,9 +416,8 @@ const card = document.createElement("div");
 card.className = "product-card";
 
 // 🖼️ Intentar mostrar miniatura del producto
-const imgSrc = getDriveThumbnail(foto);
-const imgHtml = imgSrc
-  ? `<img src="${imgSrc}" alt="${name}" class="mini-foto">`
+const imgHtml = foto
+  ? `<img src="${foto}" alt="${name}" class="mini-foto">`
   : `<div class="mini-foto placeholder">📦</div>`;
 
 

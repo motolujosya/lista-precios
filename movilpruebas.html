@@ -248,6 +248,7 @@ function renderProducts(cols, rows) {
     const info = obj['info'] || "";
     const foto = obj['foto'] || obj['imagen'] || "";
     const link = obj['links'] || obj['link'] || "";
+    const code = obj['código'] || "";
 
     const imgSrc = githubRaw(foto); // ahora usa GitHub raw
 
@@ -258,6 +259,7 @@ function renderProducts(cols, rows) {
     card.innerHTML = `
       ${imgHtml}
       <h4>${escapeHtml(name)}</h4>
+      <p>${escapeHtml(code)}</p>
       <p>${escapeHtml(info)}</p>
       <select aria-label="Elegir precio">
         <option value="${price}">Precio venta: ${formatCurrency(price)}</option>

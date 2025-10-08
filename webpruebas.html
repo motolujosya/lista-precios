@@ -420,13 +420,13 @@ function renderProducts(cols, rows) {
     const obj = {};
     cols.forEach((c, i) => obj[c] = r[i]);
     
-    const code = obj["código"];
     const name = obj["producto"];
     const price = obj["precio venta"];
     const priceDesc = obj["precio max desc"];
     const info = obj["info"];
     const foto = obj["foto"];
     const link = obj["links"];
+    const code = obj["codigo"];
 
     if (!name) return;
 

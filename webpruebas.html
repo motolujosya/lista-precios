@@ -420,7 +420,7 @@ function renderProducts(cols, rows) {
     const obj = {};
     cols.forEach((c, i) => obj[c] = r[i]);
     
-    const codigo = obj["codigo"];
+    const codigo = obj["código"];
     const name = obj["producto"];
     const price = obj["precio venta"];
     const priceDesc = obj["precio max desc"];
@@ -446,7 +446,7 @@ const imgHtml = foto
 
 
     card.innerHTML = `
-  <p>${codigo || ""}</p>
+  <p>${código || ""}</p>
   ${imgHtml}
   <h4>${name}</h4>
   <p>${info || ""}</p>

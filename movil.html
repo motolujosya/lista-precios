@@ -259,7 +259,7 @@ function renderProducts(cols, rows) {
     card.innerHTML = `
       ${imgHtml}
       <h4>${escapeHtml(name)}</h4>
-      <p> <strong>Código:</strong>${escapeHtml(code)}</p>
+      <p>${escapeHtml(code)}</p>
       <p>${escapeHtml(info)}</p>
       <select aria-label="Elegir precio">
         <option value="${price}">Precio venta: ${formatCurrency(price)}</option>

@@ -422,8 +422,8 @@ function renderProducts(cols, rows) {
 
     const code = obj["código"];
     const name = obj["producto"];
-    const price = obj["precio venta"];
-    const priceDesc = obj["precio max desc"];
+    const price = obj["precio publico"];
+    const priceDesc = obj["precio taller"];
     const info = obj["info"];
     const foto = obj["foto"];
     const link = obj["links"];
@@ -450,8 +450,8 @@ const imgHtml = foto
   <p><strong>Código:</strong> ${code || ""}</p>
   <p>${info || ""}</p>
   <select>
-    <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
-    <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
+    <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
+    <option value="${priceDesc}">Precio Taller: ${formatCurrency(priceDesc)}</option>
   </select><br>
   <button class="add-btn">Agregar</button>
   <button class="copy-btn">Copiar</button>

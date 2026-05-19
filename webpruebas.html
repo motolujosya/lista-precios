@@ -333,6 +333,26 @@
   btn.textContent = "✅ Finalizar compra";
 };
 
+function parseFechaSheet(val) {
+  try {
+    // Formato que devuelve gviz: "Date(2024,11,25,10,30,0)"
+    if (typeof val === "string" && val.startsWith("Date(")) {
+      const partes = val.replace("Date(", "").replace(")", "").split(",").map(Number);
+      const fecha = new Date(partes[0], partes[1], partes[2], partes[3] || 0, partes[4] || 0);
+      return fecha.toLocaleString("es-CO");
+    }
+    // Si es número (serial de Excel/Sheets)
+    if (typeof val === "number") {
+      const fecha = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return fecha.toLocaleString("es-CO");
+    }
+    // Si ya es string normal
+    return new Date(val).toLocaleString("es-CO");
+  } catch(e) {
+    return val || "—";
+  }
+}
+
   // 📋 Ver historial
   async function verHistorial() {
     const VENTAS_NAME = "Ventas";
@@ -352,7 +372,7 @@
       } else {
         // Mostrar las más recientes primero
         [...rows].reverse().forEach(r => {
-          const fecha = r[0] ? new Date(r[0]).toLocaleString("es-CO") : "—";
+          const fecha = r[0] ? parseFechaSheet(r[0]) : "—";
           tbody.innerHTML += `
             <tr>
               <td>${fecha}</td>

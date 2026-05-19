@@ -175,8 +175,8 @@
       cols.forEach((c, i) => obj[c] = r[i]);
 
       const name = obj["producto"];
-      const price = obj["precio venta"];
-      const priceDesc = obj["precio max desc"];
+      const price = obj["precio publico"];
+      const priceDesc = obj["precio taller"];
       const info = obj["info"];
       const foto = obj["foto"];
       const link = obj["links"];
@@ -202,8 +202,8 @@
         <p>${info || ""}</p>
         <p class="${stockClass}">${stockLabel}</p>
         <select>
-          <option value="${price}">Precio venta: ${formatCurrency(price)}</option>
-          <option value="${priceDesc}">Precio desc: ${formatCurrency(priceDesc)}</option>
+          <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
+          <option value="${priceDesc}">Precio Taller: ${formatCurrency(priceDesc)}</option>
         </select><br>
         <button class="add-btn" ${stock === 0 ? "disabled" : ""}>Agregar</button>
         <button class="copy-btn">Copiar</button>

@@ -384,14 +384,10 @@ function parseFechaSheet(val) {
 
         [...rows].reverse().forEach(r => {
 
-          const fechaObj = new Date(parseFechaSheet(r[0]));
+          const fechaVisible = parseFechaSheet(r[0]);
 
-          const fechaVisible = fechaObj.toLocaleString("es-CO");
-
-          const fechaDia =
-            fechaObj.getFullYear() + "-" +
-            String(fechaObj.getMonth() + 1).padStart(2, "0") + "-" +
-            String(fechaObj.getDate()).padStart(2, "0");
+          // obtener solo la fecha
+          const fechaDia = fechaVisible.split(" ")[0];
 
           const subtotal = Number(r[4]) || 0;
 
@@ -410,7 +406,7 @@ function parseFechaSheet(val) {
               <td>${formatCurrency(r[3])}</td>
               <td>${formatCurrency(subtotal)}</td>
             </tr>`;
-        });
+          });
       }
 
       // Mostrar resumen por día

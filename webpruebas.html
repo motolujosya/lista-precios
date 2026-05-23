@@ -232,9 +232,14 @@
     });
   }
 
+
   function formatCurrency(num) {
+
     if (!num) return "$0";
-    return "$" + parseFloat(num).toLocaleString("es-CO");
+
+    const valor = Math.round(parseFloat(num));
+
+    return "$" + valor.toLocaleString("es-CO");
   }
 
   function filterProducts() {
@@ -336,11 +341,35 @@
 
 function parseFechaSheet(val) {
 
-  if (!val) return "—";
+if (!val) return "—";
 
-  // quitar apostrofe oculto de Sheets
-  return val.toString().replace(/^'/, "");
+// Formato Google GViz: Date(2026,4,23,14,25,44)
+if (typeof val === "string" && val.startsWith("Date(")) {
 
+  const partes = val
+    .replace("Date(", "")
+    .replace(")", "")
+    .split(",")
+    .map(Number);
+
+  const año = partes[0];
+  const mes = partes[1] + 1;
+  const dia = partes[2];
+  const hora = partes[3] || 0;
+  const minuto = partes[4] || 0;
+  const segundo = partes[5] || 0;
+
+  return (
+    año + "-" +
+    String(mes).padStart(2, "0") + "-" +
+    String(dia).padStart(2, "0") + " " +
+    String(hora).padStart(2, "0") + ":" +
+    String(minuto).padStart(2, "0") + ":" +
+    String(segundo).padStart(2, "0")
+  );
+}
+
+return val.toString().replace(/^'/, "");
 }
 
   // 📋 Ver historial

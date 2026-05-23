@@ -357,7 +357,9 @@ function parseFechaSheet(val) {
         text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
       );
 
-      const rows = json.table.rows.map(r => r.c.map(c => c ? c.v : ""));
+      const rows = json.table.rows.map(r =>
+        r.c.map(c => c ? (c.f || c.v) : "")
+      );
 
       const tbody = document.getElementById("historialBody");
       tbody.innerHTML = "";

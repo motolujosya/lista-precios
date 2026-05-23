@@ -348,7 +348,7 @@ function parseFechaSheet(val) {
       return fecha.toLocaleString("es-CO");
     }
     // Si ya es string normal
-    return new Date(val).toLocaleString("es-CO");
+    return val;
   } catch(e) {
     return val || "—";
   }

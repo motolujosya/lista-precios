@@ -335,23 +335,12 @@
 };
 
 function parseFechaSheet(val) {
-  try {
-    // Formato que devuelve gviz: "Date(2024,11,25,10,30,0)"
-    if (typeof val === "string" && val.startsWith("Date(")) {
-      const partes = val.replace("Date(", "").replace(")", "").split(",").map(Number);
-      const fecha = new Date(partes[0], partes[1], partes[2], partes[3] || 0, partes[4] || 0);
-      return fecha.toLocaleString("es-CO");
-    }
-    // Si es número (serial de Excel/Sheets)
-    if (typeof val === "number") {
-      const fecha = new Date(Math.round((val - 25569) * 86400 * 1000));
-      return fecha.toLocaleString("es-CO");
-    }
-    // Si ya es string normal
-    return val;
-  } catch(e) {
-    return val || "—";
-  }
+
+  if (!val) return "—";
+
+  // quitar apostrofe oculto de Sheets
+  return val.toString().replace(/^'/, "");
+
 }
 
   // 📋 Ver historial

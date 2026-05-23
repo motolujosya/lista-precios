@@ -122,6 +122,7 @@
   <div id="historialContent">
     <button class="close-historial" onclick="document.getElementById('historialModal').style.display='none'">✖ Cerrar</button>
     <h3>📋 Historial de ventas</h3>
+    <div id="totalesPorDia" style="margin:10px 0; font-weight:bold;"></div>
     <table id="historialTable">
       <thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th></tr></thead>
       <tbody id="historialBody"></tbody>
@@ -361,32 +362,76 @@ function parseFechaSheet(val) {
     try {
       const res = await fetch(url);
       const text = await res.text();
-      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+      const json = JSON.parse(
+        text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
+      );
+
       const rows = json.table.rows.map(r => r.c.map(c => c ? c.v : ""));
 
       const tbody = document.getElementById("historialBody");
       tbody.innerHTML = "";
 
+      const resumenDias = {};
+
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center">Sin ventas registradas aún.</td></tr>`;
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align:center">
+              Sin ventas registradas aún.
+            </td>
+          </tr>`;
       } else {
-        // Mostrar las más recientes primero
+
         [...rows].reverse().forEach(r => {
-          const fecha = r[0] ? parseFechaSheet(r[0]) : "—";
+
+          const fechaObj = new Date(parseFechaSheet(r[0]));
+
+          const fechaVisible = fechaObj.toLocaleString("es-CO");
+
+          const fechaDia =
+            fechaObj.getFullYear() + "-" +
+            String(fechaObj.getMonth() + 1).padStart(2, "0") + "-" +
+            String(fechaObj.getDate()).padStart(2, "0");
+
+          const subtotal = Number(r[4]) || 0;
+
+          // acumular total diario
+          if (!resumenDias[fechaDia]) {
+            resumenDias[fechaDia] = 0;
+          }
+
+          resumenDias[fechaDia] += subtotal;
+
           tbody.innerHTML += `
             <tr>
-              <td>${fecha}</td>
+              <td>${fechaVisible}</td>
               <td>${r[1] || "—"}</td>
               <td>${r[2] || 0}</td>
               <td>${formatCurrency(r[3])}</td>
-              <td>${formatCurrency(r[4])}</td>
+              <td>${formatCurrency(subtotal)}</td>
             </tr>`;
         });
       }
 
+      // Mostrar resumen por día
+      let resumenHTML = "💰 Totales por día:<br><br>";
+
+      Object.keys(resumenDias)
+        .sort()
+        .reverse()
+        .forEach(fecha => {
+          resumenHTML += `
+            ${fecha}: ${formatCurrency(resumenDias[fecha])}<br>
+          `;
+        });
+
+      document.getElementById("totalesPorDia").innerHTML = resumenHTML;
+
       document.getElementById("historialModal").style.display = "flex";
+
     } catch (e) {
-      alert("❌ No se pudo cargar el historial. Asegúrate de que la hoja 'Ventas' esté pública.");
+      alert("❌ No se pudo cargar el historial.");
+      console.error(e);
     }
   }
 

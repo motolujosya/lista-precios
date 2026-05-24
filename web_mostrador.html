@@ -417,16 +417,38 @@ async function guardarPedidoPendiente() {
     nota: document.getElementById("pedidoAdicional").value
   };
 
-  await fetch(APPS_SCRIPT_URL, {
-    method: "POST",
-    body: JSON.stringify(data)
-  });
+  try {
 
-  alert("✅ Guardado");
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
 
-  document.getElementById("pedidoModal").style.display = "none";
+      mode: "no-cors",
 
-  cargarSugerencias();
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify(data)
+    });
+
+    showToast("✅ Guardado correctamente");
+
+    document.getElementById("pedidoModal").style.display = "none";
+
+    document.getElementById("pedidoMoto").value = "";
+
+    document.getElementById("pedidoProducto").value = "";
+
+    document.getElementById("pedidoAdicional").value = "";
+
+    cargarSugerencias();
+
+  } catch(err) {
+
+    console.error(err);
+
+    alert("❌ Error al guardar");
+  }
 }
 
   function filterProducts() {

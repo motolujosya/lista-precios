@@ -75,6 +75,45 @@
   .historial-btn { background: linear-gradient(90deg, #ff9800, #ffc107); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
   .historial-btn:hover { transform: scale(1.02); }
 
+
+  .modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+  }
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggestions {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  background: #f0f0f0;
+}
+
   /* Toast */
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.4s; z-index: 9999; pointer-events: none; }
   #toast.show { opacity: 1; }
@@ -89,6 +128,10 @@
 <button class="historial-btn" onclick="verHistorial()">📋 Ver historial de ventas</button>
 
 <div class="product-grid" id="productGrid"></div>
+
+<button onclick="abrirModalPedido()">
+  📝 Agregar faltante
+</button>
 
 <!-- Carrito -->
 <div id="cartPanel" class="cart-panel">
@@ -130,6 +173,32 @@
   </div>
 </div>
 
+<div id="pedidoModal" class="modal">
+
+  <div class="modal-content">
+
+    <h2>Agregar faltante</h2>
+
+    <input id="pedidoMoto" placeholder="Moto">
+
+    <div id="motoSuggestions" class="suggestions"></div>
+
+    <input id="pedidoProducto" placeholder="Producto">
+
+    <div id="productoSuggestions" class="suggestions"></div>
+
+    <textarea
+      id="pedidoAdicional"
+      placeholder="Nota"
+    ></textarea>
+
+    <button onclick="guardarPedidoPendiente()">
+      Guardar
+    </button>
+
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -139,6 +208,21 @@
 
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
+
+  let sugerencias = {
+      motos: [],
+      productos: [],
+      adicionales: []
+    };
+
+  async function cargarSugerencias() {
+
+    const res = await fetch(
+      APP_SCRIPT_URL + "?action=sugerencias"
+    );
+
+    sugerencias = await res.json();
+  }
 
   // Cargar productos
   window.google = window.google || {};
@@ -249,6 +333,48 @@
     });
   }
 
+  function abrirModalPedido() {
+    document.getElementById("pedidoModal").style.display = "flex";
+  }
+
+
+
+  function setupAutocomplete(inputId, list, containerId) {
+
+    const input = document.getElementById(inputId);
+
+    const container = document.getElementById(containerId);
+
+    input.addEventListener("input", () => {
+
+      const value = input.value.toLowerCase();
+
+      container.innerHTML = "";
+
+      if (!value) return;
+
+      const matches = list.filter(item =>
+        item.toLowerCase().includes(value)
+      );
+
+      matches.slice(0, 5).forEach(match => {
+
+        const div = document.createElement("div");
+
+        div.className = "suggestion-item";
+
+        div.innerText = match;
+
+        div.onclick = () => {
+          input.value = match;
+          container.innerHTML = "";
+        };
+
+        container.appendChild(div);
+      });
+    });
+    }
+
   // Carrito
   const cartIcon = document.getElementById("cartIcon");
   const cartCount = document.getElementById("cartCount");
@@ -317,12 +443,13 @@
   btn.textContent = "⏳ Procesando...";
 
   try {
-    await fetch(APPS_SCRIPT_URL, {
+    await fetch(APP_SCRIPT_URL, {
       method: "POST",
-      mode: "no-cors", // ← esto soluciona el CORS en GitHub Pages
-      body: JSON.stringify({ items: cart }),
-      headers: { "Content-Type": "application/json" }
-    });
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+      });
 
     // Con no-cors no podemos leer la respuesta, asumimos éxito
     showToast("✅ ¡Compra finalizada! Inventario actualizado.");
@@ -424,6 +551,32 @@ function parseFechaSheet(val) {
     }
   }
 
+  async function guardarPedidoPendiente() {
+
+    const data = {
+      action: "guardarPedidoPendiente",
+
+      proveedor: "",
+
+      moto: document.getElementById("pedidoMoto").value,
+
+      producto: document.getElementById("pedidoProducto").value,
+
+      adicional: document.getElementById("pedidoAdicional").value
+    };
+
+    await fetch(APP_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+
+    alert("✅ Guardado");
+
+    document.getElementById("pedidoModal").style.display = "none";
+
+    cargarSugerencias();
+    }
+
   // Resumen modal
   document.getElementById("viewSummaryBtn").onclick = () => {
     const table = document.getElementById("summaryTable");
@@ -454,6 +607,25 @@ function parseFechaSheet(val) {
     t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), 2800);
   }
+
+  window.addEventListener("DOMContentLoaded", async () => {
+
+    await cargarSugerencias();
+
+    setupAutocomplete(
+      "pedidoMoto",
+      sugerencias.motos,
+      "motoSuggestions"
+    );
+
+    setupAutocomplete(
+      "pedidoProducto",
+      sugerencias.productos,
+      "productoSuggestions"
+    );
+
+    });
+
 </script>
 </body>
 </html>

@@ -451,9 +451,12 @@ async function guardarPedidoPendiente() {
 
   } catch(err) {
 
-    console.error(err);
+    console.error("ERROR COMPLETO:", err);
 
-    alert("❌ Error al guardar:\n\n" + err.message);
+    alert(
+      "❌ Error al guardar:\n\n" +
+      JSON.stringify(err, null, 2)
+    );
   }
 }
 

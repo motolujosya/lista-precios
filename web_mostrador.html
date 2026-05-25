@@ -242,7 +242,7 @@
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYp8SDhanUOmjWxNg4msApX9b3AJD5S4-xVQmq5hShrADKEBG8Ywt_5NvQJyBGAVNSRg/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWKwIcITidQlfAxRzKNmqALYRmgkftcZzebL2sd6CTuRzzD66iotXOzo9ITOe-plGyuQ/exec";
 
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
@@ -451,12 +451,9 @@ async function guardarPedidoPendiente() {
 
   } catch(err) {
 
-    console.error("ERROR COMPLETO:", err);
+    console.error(err);
 
-    alert(
-      "❌ Error al guardar:\n\n" +
-      JSON.stringify(err, null, 2)
-    );
+    alert("❌ Error al guardar: " + err.message);
   }
 }
 

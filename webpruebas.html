@@ -748,8 +748,8 @@
   const data = {
     items: cart.map(i => ({
       name: i.name,
-      qty: i.qty,
-      price: i.price
+      qty: Number(i.qty),
+      price: Number(i.price)  // ✅ forzar número
     }))
   };
 

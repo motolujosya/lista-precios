@@ -745,7 +745,6 @@
   btn.disabled = true;
   btn.textContent = "⏳ Procesando...";
 
-  // ✅ Construir el objeto data con los items del carrito
   const data = {
     items: cart.map(i => ({
       name: i.name,
@@ -754,13 +753,18 @@
     }))
   };
 
+  console.log("📦 Enviando al servidor:", JSON.stringify(data));
+
   try {
-    await fetch(APPS_SCRIPT_URL, {
+    const response = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)  // ✅ Ahora sí existe
+      body: JSON.stringify(data)
     });
+
+    console.log("✅ Respuesta recibida:", response);
+    console.log("Tipo:", response.type); // con no-cors siempre será "opaque"
 
     showToast("✅ ¡Compra finalizada! Inventario actualizado.");
     cart = [];
@@ -769,7 +773,8 @@
     setTimeout(() => location.reload(), 2000);
 
   } catch (err) {
-    alert("❌ Error al conectar. Verifica tu conexión.");
+    console.error("❌ Error completo:", err);
+    alert("❌ Error: " + err.message);
   }
 
   btn.disabled = false;

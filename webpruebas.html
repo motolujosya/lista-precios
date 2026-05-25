@@ -290,6 +290,53 @@
   background: #f5f9ff;
 }
 
+
+#lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  cursor: zoom-out;
+}
+#lightbox.active { display: flex; }
+#lightbox img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  transform: scale(0.85);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  cursor: default;
+}
+#lightbox.active img {
+  transform: scale(1);
+  opacity: 1;
+}
+#lightbox-close {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: none;
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+#lightbox-close:hover { background: rgba(255,255,255,0.3); }
+.mini-foto:not(.placeholder) { cursor: zoom-in; }
+
 @keyframes modalFade {
 
   from {
@@ -305,7 +352,7 @@
 
 
   /* Toast */
-  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.4s; z-index: 9999; pointer-events: none; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.4s; z-index: 99999; pointer-events: none; }
   #toast.show { opacity: 1; }
 </style>
 </head>
@@ -421,6 +468,11 @@
 
 <div id="toast"></div>
 
+<div id="lightbox">
+  <button id="lightbox-close">✖</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
@@ -485,7 +537,7 @@
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
       const imgHtml = foto
-        ? `<img src="${githubRaw(foto)}" alt="${name}" class="mini-foto">`
+        ? `<img src="${githubRaw(foto)}" alt="${name}" class="mini-foto" onclick="abrirLightbox(this.src, '${name.replace(/'/g,"\\'")}'">`
         : `<div class="mini-foto placeholder">📦</div>`;
 
       const card = document.createElement("div");
@@ -901,6 +953,31 @@ function parseFechaSheet(val) {
 
     await cargarSugerencias();
 
+    });
+
+    // Lightbox
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImg = document.getElementById("lightbox-img");
+
+    function abrirLightbox(src, alt) {
+      lightboxImg.src = src;
+      lightboxImg.alt = alt || "";
+      lightbox.classList.add("active");
+      document.body.style.overflow = "hidden";
+    }
+
+    function cerrarLightbox() {
+      lightbox.classList.remove("active");
+      document.body.style.overflow = "";
+    }
+
+    document.getElementById("lightbox-close").onclick = e => {
+      e.stopPropagation();
+      cerrarLightbox();
+    };
+    lightbox.onclick = cerrarLightbox;
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") cerrarLightbox();
     });
 
 </script>

@@ -27,6 +27,38 @@
   #cartCount { position: absolute; top: -5px; right: -5px; background: red; color: white; font-size: 12px; padding: 2px 6px; border-radius: 50%; animation: pop 0.3s ease; }
   @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); } 100% { transform: scale(1); } }
 
+  #pedidoFloatBtn {
+    position: fixed;
+    top: 85px;
+    right: 20px;
+
+    width: 52px;
+    height: 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: linear-gradient(90deg, #007bff, #00c6ff);
+
+    border-radius: 50%;
+
+    color: white;
+    font-size: 24px;
+
+    cursor: pointer;
+
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+
+    z-index: 999;
+
+    transition: transform 0.2s;
+  }
+
+  #pedidoFloatBtn:hover {
+    transform: scale(1.08);
+  }
+
   .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; }
   .cart-panel.open { transform: translateX(0); }
 
@@ -75,6 +107,203 @@
   .historial-btn { background: linear-gradient(90deg, #ff9800, #ffc107); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
   .historial-btn:hover { transform: scale(1.02); }
 
+
+  /* =========================
+   MODAL FALTANTES
+========================= */
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+
+  justify-content: center;
+  align-items: center;
+
+  z-index: 3000;
+
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+
+  width: 92%;
+  max-width: 420px;
+
+  background: #fff;
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 10px 35px rgba(0,0,0,0.18);
+
+  padding: 18px;
+
+  animation: modalFade 0.25s ease;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Header estilo carrito */
+.modal-header {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 6px;
+}
+
+.modal-header h2 {
+
+  margin: 0;
+
+  font-size: 20px;
+
+  color: #333;
+}
+
+/* Botón cerrar */
+.close-modal {
+
+  background:
+    linear-gradient(90deg,#ff4d4d,#ff6a00);
+
+  color: white;
+
+  border: none;
+
+  border-radius: 8px;
+
+  padding: 6px 10px;
+
+  cursor: pointer;
+
+  font-size: 14px;
+
+  transition: transform 0.2s;
+}
+
+.close-modal:hover {
+  transform: scale(1.05);
+}
+
+/* Inputs */
+.modal-content input,
+.modal-content textarea {
+
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border-radius: 10px;
+
+  border: 1px solid #ddd;
+
+  font-size: 14px;
+
+  box-sizing: border-box;
+
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.modal-content input:focus,
+.modal-content textarea:focus {
+
+  outline: none;
+
+  border-color: #00c6ff;
+
+  box-shadow:
+    0 0 0 3px rgba(0,198,255,0.15);
+}
+
+.modal-content textarea {
+
+  resize: vertical;
+
+  min-height: 90px;
+}
+
+/* Botón guardar */
+.modal-save-btn {
+
+  border: none;
+
+  padding: 12px;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  color: white;
+
+  font-weight: bold;
+
+  font-size: 15px;
+
+  background:
+    linear-gradient(90deg,#007bff,#00c6ff);
+
+  transition:
+    transform 0.2s,
+    opacity 0.2s;
+}
+
+.modal-save-btn:hover {
+  transform: scale(1.02);
+}
+
+/* Sugerencias */
+.suggestions {
+
+  border: 1px solid #eee;
+
+  border-radius: 10px;
+
+  overflow: hidden;
+
+  max-height: 150px;
+
+  overflow-y: auto;
+
+  background: white;
+}
+
+.suggestion-item {
+
+  padding: 10px;
+
+  cursor: pointer;
+
+  transition: background 0.15s;
+}
+
+.suggestion-item:hover {
+  background: #f5f9ff;
+}
+
+@keyframes modalFade {
+
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
   /* Toast */
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.4s; z-index: 9999; pointer-events: none; }
   #toast.show { opacity: 1; }
@@ -85,10 +314,15 @@
 <h2>🛍️ Catálogo de productos</h2>
 <input id="search" placeholder="Buscar por nombre o info..." oninput="filterProducts()">
 <div id="cartIcon">🛒<span id="cartCount">0</span></div>
+<div id="pedidoFloatBtn" onclick="abrirModalPedido()">
+  📝
+</div>
+
 
 <button class="historial-btn" onclick="verHistorial()">📋 Ver historial de ventas</button>
 
 <div class="product-grid" id="productGrid"></div>
+
 
 <!-- Carrito -->
 <div id="cartPanel" class="cart-panel">
@@ -130,15 +364,75 @@
   </div>
 </div>
 
+<!-- Modal faltantes -->
+<div id="pedidoModal" class="modal">
+
+  <div class="modal-content">
+
+    <div class="modal-header">
+
+      <h2>📝 Agregar faltante</h2>
+
+      <button
+        class="close-modal"
+        onclick="cerrarModalPedido()"
+      >
+        ✖
+      </button>
+
+    </div>
+
+    <input
+      id="pedidoMoto"
+      placeholder="Moto"
+    >
+
+    <div
+      id="motoSuggestions"
+      class="suggestions"
+    ></div>
+
+    <input
+      id="pedidoProducto"
+      placeholder="Producto"
+    >
+
+    <div
+      id="productoSuggestions"
+      class="suggestions"
+    ></div>
+
+    <textarea
+      id="pedidoAdicional"
+      placeholder="Nota adicional"
+    ></textarea>
+
+    <button
+      class="modal-save-btn"
+      onclick="guardarPedidoPendiente()"
+    >
+      💾 Guardar faltante
+    </button>
+
+  </div>
+
+</div>
+
+
 <div id="toast"></div>
 
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYp8SDhanUOmjWxNg4msApX9b3AJD5S4-xVQmq5hShrADKEBG8Ywt_5NvQJyBGAVNSRg/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWKwIcITidQlfAxRzKNmqALYRmgkftcZzebL2sd6CTuRzzD66iotXOzo9ITOe-plGyuQ/exec";
 
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
+
+  let sugerencias = {
+    motos: [],
+    productos: []
+  };
 
   // Cargar productos
   window.google = window.google || {};
@@ -242,6 +536,141 @@
     return "$" + valor.toLocaleString("es-CO");
   }
 
+  function abrirModalPedido() {
+    document.getElementById("pedidoModal").style.display = "flex";
+  }
+
+  function cerrarModalPedido() {
+
+    document.getElementById(
+      "pedidoModal"
+    ).style.display = "none";
+  }
+
+  /* cerrar al hacer click afuera */
+  window.addEventListener("click", e => {
+
+    const modal =
+      document.getElementById("pedidoModal");
+
+    if (e.target === modal) {
+
+      cerrarModalPedido();
+    }
+  });
+
+  async function cargarSugerencias() {
+
+    const res = await fetch(
+      APPS_SCRIPT_URL + "?action=sugerencias"
+    );
+
+    sugerencias = await res.json();
+
+    // volver a conectar autocomplete
+    setupAutocomplete(
+      "pedidoMoto",
+      sugerencias.motos,
+      "motoSuggestions"
+    );
+
+    setupAutocomplete(
+      "pedidoProducto",
+      sugerencias.productos,
+      "productoSuggestions"
+    );
+    }
+
+    function setupAutocomplete(inputId, list, containerId) {
+
+      const input =
+        document.getElementById(inputId);
+
+      const container =
+        document.getElementById(containerId);
+
+      input.oninput = () => {
+
+        const value =
+          input.value.toLowerCase().trim();
+
+        container.innerHTML = "";
+
+        if (!value) return;
+
+        const matches = list.filter(item =>
+          item.toLowerCase().includes(value)
+        );
+
+        matches.slice(0, 5).forEach(match => {
+
+          const div =
+            document.createElement("div");
+
+          div.className = "suggestion-item";
+
+          div.innerText = match;
+
+          div.onclick = () => {
+
+            input.value = match;
+
+            container.innerHTML = "";
+          };
+
+          container.appendChild(div);
+        });
+      };
+      }
+
+  async function guardarPedidoPendiente() {
+
+  const data = {
+    action: "guardarPedidoPendiente",
+
+    proveedor: "",
+
+    moto: document.getElementById("pedidoMoto").value,
+
+    producto: document.getElementById("pedidoProducto").value,
+
+    nota: document.getElementById("pedidoAdicional").value
+  };
+
+  try {
+
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+
+      mode: "no-cors",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify(data)
+    });
+
+    showToast("✅ Guardado correctamente");
+
+    document.getElementById("pedidoModal").style.display = "none";
+
+    document.getElementById("pedidoMoto").value = "";
+
+    document.getElementById("pedidoProducto").value = "";
+
+    document.getElementById("pedidoAdicional").value = "";
+
+    cargarSugerencias();
+
+  } catch(err) {
+
+    console.error(err);
+
+    alert("❌ Error al guardar");
+  }
+}
+
   function filterProducts() {
     const q = document.getElementById("search").value.toLowerCase();
     document.querySelectorAll(".product-card").forEach(c => {
@@ -319,9 +748,10 @@
   try {
     await fetch(APPS_SCRIPT_URL, {
       method: "POST",
-      mode: "no-cors", // ← esto soluciona el CORS en GitHub Pages
-      body: JSON.stringify({ items: cart }),
-      headers: { "Content-Type": "application/json" }
+
+      mode: "no-cors",
+
+      body: JSON.stringify(data)
     });
 
     // Con no-cors no podemos leer la respuesta, asumimos éxito
@@ -454,6 +884,13 @@ function parseFechaSheet(val) {
     t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), 2800);
   }
+
+  window.addEventListener("DOMContentLoaded", async () => {
+
+    await cargarSugerencias();
+
+    });
+
 </script>
 </body>
 </html>

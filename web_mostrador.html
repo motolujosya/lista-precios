@@ -559,50 +559,69 @@
     }
   });
 
-async function cargarSugerencias() {
+  async function cargarSugerencias() {
 
-  const res = await fetch(
-    APPS_SCRIPT_URL + "?action=sugerencias"
-  );
-
-  sugerencias = await res.json();
-}
-
-function setupAutocomplete(inputId, list, containerId) {
-
-  const input = document.getElementById(inputId);
-
-  const container = document.getElementById(containerId);
-
-  input.addEventListener("input", () => {
-
-    const value = input.value.toLowerCase();
-
-    container.innerHTML = "";
-
-    if (!value) return;
-
-    const matches = list.filter(item =>
-      item.toLowerCase().includes(value)
+    const res = await fetch(
+      APPS_SCRIPT_URL + "?action=sugerencias"
     );
 
-    matches.slice(0, 5).forEach(match => {
+    sugerencias = await res.json();
 
-      const div = document.createElement("div");
+    // volver a conectar autocomplete
+    setupAutocomplete(
+      "pedidoMoto",
+      sugerencias.motos,
+      "motoSuggestions"
+    );
 
-      div.className = "suggestion-item";
+    setupAutocomplete(
+      "pedidoProducto",
+      sugerencias.productos,
+      "productoSuggestions"
+    );
+    }
 
-      div.innerText = match;
+    function setupAutocomplete(inputId, list, containerId) {
 
-      div.onclick = () => {
-        input.value = match;
+      const input =
+        document.getElementById(inputId);
+
+      const container =
+        document.getElementById(containerId);
+
+      input.oninput = () => {
+
+        const value =
+          input.value.toLowerCase().trim();
+
         container.innerHTML = "";
-      };
 
-      container.appendChild(div);
-    });
-  });
-}
+        if (!value) return;
+
+        const matches = list.filter(item =>
+          item.toLowerCase().includes(value)
+        );
+
+        matches.slice(0, 5).forEach(match => {
+
+          const div =
+            document.createElement("div");
+
+          div.className = "suggestion-item";
+
+          div.innerText = match;
+
+          div.onclick = () => {
+
+            input.value = match;
+
+            container.innerHTML = "";
+          };
+
+          container.appendChild(div);
+        });
+      };
+      }
 
   async function guardarPedidoPendiente() {
 
@@ -869,18 +888,6 @@ function parseFechaSheet(val) {
   window.addEventListener("DOMContentLoaded", async () => {
 
     await cargarSugerencias();
-
-    setupAutocomplete(
-      "pedidoMoto",
-      sugerencias.motos,
-      "motoSuggestions"
-    );
-
-    setupAutocomplete(
-      "pedidoProducto",
-      sugerencias.productos,
-      "productoSuggestions"
-    );
 
     });
 

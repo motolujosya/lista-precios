@@ -748,8 +748,8 @@
   const data = {
     items: cart.map(i => ({
       name: i.name,
-      qty: Number(i.qty),
-      price: Number(i.price)  // ✅ forzar número
+      qty: parseInt(i.qty),
+      price: Math.round(parseFloat(i.price))
     }))
   };
 

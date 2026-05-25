@@ -536,8 +536,9 @@
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
+      const imgUrl = githubRaw(foto);
       const imgHtml = foto
-        ? `<img src="${githubRaw(foto)}" alt="${name}" class="mini-foto" data-name="${name.replace(/"/g,'&quot;')}" onclick="abrirLightbox(this.src, this.dataset.name)">`
+        ? `<img src="${imgUrl}" alt="" class="mini-foto" onclick="abrirLightbox(this.src)">`
         : `<div class="mini-foto placeholder">📦</div>`;
 
       const card = document.createElement("div");
@@ -969,9 +970,9 @@ function parseFechaSheet(val) {
 const lightbox = document.getElementById("lightbox");
 const lightboxImg = document.getElementById("lightbox-img");
 
-window.abrirLightbox = function(src, alt) {
+window.abrirLightbox = function(src) {
   lightboxImg.src = src;
-  lightboxImg.alt = alt || "";
+  lightboxImg.alt = "";
   lightbox.classList.add("active");
   document.body.style.overflow = "hidden";
 };

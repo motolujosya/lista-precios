@@ -956,29 +956,31 @@ function parseFechaSheet(val) {
     });
 
     // Lightbox
-    const lightbox = document.getElementById("lightbox");
-    const lightboxImg = document.getElementById("lightbox-img");
+    // Lightbox
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
 
-    function abrirLightbox(src, alt) {
-      lightboxImg.src = src;
-      lightboxImg.alt = alt || "";
-      lightbox.classList.add("active");
-      document.body.style.overflow = "hidden";
-    }
+window.abrirLightbox = function(src, alt) {
+  lightboxImg.src = src;
+  lightboxImg.alt = alt || "";
+  lightbox.classList.add("active");
+  document.body.style.overflow = "hidden";
+};
 
-    function cerrarLightbox() {
-      lightbox.classList.remove("active");
-      document.body.style.overflow = "";
-    }
+function cerrarLightbox() {
+  lightbox.classList.remove("active");
+  document.body.style.overflow = "";
+}
 
-    document.getElementById("lightbox-close").onclick = e => {
-      e.stopPropagation();
-      cerrarLightbox();
-    };
-    lightbox.onclick = cerrarLightbox;
-    document.addEventListener("keydown", e => {
-      if (e.key === "Escape") cerrarLightbox();
-    });
+document.getElementById("lightbox-close").onclick = e => {
+  e.stopPropagation();
+  cerrarLightbox();
+};
+
+lightbox.onclick = cerrarLightbox;
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") cerrarLightbox();
+});
 
 </script>
 </body>

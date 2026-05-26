@@ -379,6 +379,8 @@
   </div>
   <div id="cartItems"></div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+  <div id="sugerenciasPanel" style="display:none; margin-top:12px; padding-top:10px;
+     border-top:1px solid #eee; max-height:280px; overflow-y:auto;"></div>
   <div class="cart-actions">
     <button id="viewSummaryBtn" class="summary-btn">🧾 Resumen</button>
     <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar</button>
@@ -529,10 +531,15 @@
       const link = obj["links"];
       const code = obj["código"];
       const stock = parseInt(obj["inventario"]) || 0;
+      const rel1 = obj["relacionado1"] || "";
+      const rel2 = obj["relacionado2"] || "";
+      const rel3 = obj["relacionado3"] || "";
+      const rel4 = obj["relacionado4"] || "";
+      const relacionados = [rel1, rel2, rel3, rel4].filter(Boolean);
 
       if (!name) return;
 
-      productosData.push({ name, stock });
+      productosData.push({ name, stock, price, priceDesc, foto, relacionados });
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
@@ -750,11 +757,68 @@
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
 
   function addToCart(name, price) {
-    const existing = cart.find(p => p.name === name && p.price == price);
-    if (existing) existing.qty++;
-    else cart.push({ name, price: parseFloat(price), qty: 1 });
-    updateCartDisplay();
-    animateCartCount();
+  const existing = cart.find(p => p.name === name && p.price == price);
+  if (existing) existing.qty++;
+  else cart.push({ name, price: parseFloat(price), qty: 1 });
+  updateCartDisplay();
+  animateCartCount();
+  mostrarSugerencias(name);
+}
+
+  function mostrarSugerencias(name) {
+    const producto = productosData.find(p => p.name === name);
+    const panel = document.getElementById("sugerenciasPanel");
+
+    if (!producto || producto.relacionados.length === 0) {
+      panel.style.display = "none";
+      return;
+    }
+
+    const relacionados = producto.relacionados
+      .map(r => productosData.find(p => p.name === r))
+      .filter(p => p && p.stock > 0);
+
+    if (relacionados.length === 0) {
+      panel.style.display = "none";
+      return;
+    }
+
+    panel.style.display = "block";
+    panel.innerHTML = `
+      <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
+        💡 También te recomendamos:
+      </p>
+      ${relacionados.map(p => {
+        const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
+        const fotoUrl = p.foto ? githubRaw(p.foto) : "";
+        return `
+          <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
+                      border-radius:8px; padding:8px; margin-bottom:6px;">
+            ${fotoUrl
+              ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;
+                  border-radius:6px; flex-shrink:0;">`
+              : `<div style="width:48px; height:48px; background:#eee; border-radius:6px;
+                  display:flex; align-items:center; justify-content:center; font-size:20px;">📦</div>`
+            }
+            <div style="flex:1; min-width:0;">
+              <p style="margin:0; font-size:12px; font-weight:bold; color:#333;
+                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${p.name}
+              </p>
+              <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
+                ${formatCurrency(precioMostrar)}
+              </p>
+            </div>
+            <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}')"
+                    style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
+                          border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
+                          font-size:12px; flex-shrink:0;">
+              + Agregar
+            </button>
+          </div>
+        `;
+      }).join("")}
+    `;
   }
 
   function updateCartDisplay() {

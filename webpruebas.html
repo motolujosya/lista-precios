@@ -62,7 +62,7 @@
   .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; }
   .cart-panel.open { transform: translateX(0); }
 
-  #cartItems { max-height: calc(100vh - 220px); overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: #ccc transparent; }
+  #cartItems { max-height: calc(100vh - 380px); overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: #ccc transparent; }
   #cartItems::-webkit-scrollbar { width: 6px; }
   #cartItems::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
 
@@ -380,7 +380,7 @@
   <div id="cartItems"></div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
   <div id="sugerenciasPanel" style="display:none; margin-top:12px; padding-top:10px;
-     border-top:1px solid #eee; max-height:280px; overflow-y:auto;"></div>
+     border-top:1px solid #eee; max-height:180px; overflow-y:auto;"></div>
   <div class="cart-actions">
     <button id="viewSummaryBtn" class="summary-btn">🧾 Resumen</button>
     <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar</button>
@@ -776,7 +776,7 @@
 
     const relacionados = producto.relacionados
       .map(r => productosData.find(p => p.name === r))
-      .filter(p => p && p.stock > 0);
+      .filter(p => p && p.stock > 0 && !cart.find(c => c.name === p.name));
 
     if (relacionados.length === 0) {
       panel.style.display = "none";
@@ -833,10 +833,18 @@
         <span>${formatCurrency(item.price * item.qty)}</span>
         <button class="remove-item">🗑️</button>
       `;
+
       row.querySelector(".remove-item").addEventListener("click", () => {
         row.classList.add("removing");
-        setTimeout(() => { cart.splice(i, 1); updateCartDisplay(); }, 400);
+        setTimeout(() => {
+          cart.splice(i, 1);
+          updateCartDisplay();
+          if (cart.length === 0) {
+            document.getElementById("sugerenciasPanel").style.display = "none";
+          }
+        }, 400);
       });
+
       cartItemsDiv.appendChild(row);
     });
     document.getElementById("cartTotal").textContent = formatCurrency(total);
@@ -859,6 +867,7 @@
       cart = [];
       updateCartDisplay();
       showToast("🗑️ Carrito vaciado.");
+      document.getElementById("sugerenciasPanel").style.display = "none";
     }
   };
 

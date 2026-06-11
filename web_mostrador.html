@@ -579,7 +579,8 @@
 
       card.querySelector(".copy-btn").onclick = () => {
         const val = card.querySelector("select").value;
-        navigator.clipboard.writeText(`${name} - ${formatCurrency(val)}`);
+        const texto = buildProductLabel(code, name, info);
+        navigator.clipboard.writeText(`${buildProductLabel(code, name, info)} - ${formatCurrency(val)}`);
         card.querySelector(".copy-btn").textContent = "✅ Copiado";
         setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
       };

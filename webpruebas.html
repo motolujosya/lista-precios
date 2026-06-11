@@ -354,126 +354,6 @@
   /* Toast */
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.4s; z-index: 99999; pointer-events: none; }
   #toast.show { opacity: 1; }
-
-  /* Botón chat flotante */
-  #chatFloatBtn {
-    position: fixed;
-    top: 155px;
-    right: 20px;
-    width: 52px;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(90deg, #6f42c1, #a855f7);
-    border-radius: 50%;
-    color: white;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    z-index: 999;
-    transition: transform 0.2s;
-  }
-  #chatFloatBtn:hover { transform: scale(1.08); }
-
-  /* Panel lateral chat */
-  #chatPanel {
-    position: fixed;
-    right: 0;
-    top: 0;
-    height: 100%;
-    width: 340px;
-    background: #fff;
-    box-shadow: -3px 0 10px rgba(0,0,0,0.2);
-    padding: 15px;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-  }
-  #chatPanel.open { transform: translateX(0); }
-
-  .chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-
-  #chatMessages {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 4px 0;
-    margin-bottom: 12px;
-  }
-  #chatMessages::-webkit-scrollbar { width: 6px; }
-  #chatMessages::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
-
-  .chat-bubble {
-    max-width: 85%;
-    padding: 10px 14px;
-    border-radius: 16px;
-    font-size: 14px;
-    line-height: 1.4;
-    word-wrap: break-word;
-  }
-  .chat-bubble.user {
-    align-self: flex-end;
-    background: linear-gradient(90deg, #6f42c1, #a855f7);
-    color: white;
-    border-bottom-right-radius: 4px;
-  }
-  .chat-bubble.bot {
-    align-self: flex-start;
-    background: #f1f1f1;
-    color: #333;
-    border-bottom-left-radius: 4px;
-  }
-  .chat-bubble.typing {
-    align-self: flex-start;
-    background: #f1f1f1;
-    color: #999;
-    font-style: italic;
-  }
-
-  .chat-input-area {
-    display: flex;
-    gap: 8px;
-    border-top: 1px solid #eee;
-    padding-top: 10px;
-  }
-  #chatInput {
-    flex: 1;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
-    font-size: 14px;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    resize: none;
-    box-sizing: border-box;
-  }
-  #chatInput:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 0 3px rgba(168,85,247,0.15);
-  }
-  #chatSendBtn {
-    background: linear-gradient(90deg, #6f42c1, #a855f7);
-    color: white;
-    border: none;
-    padding: 10px 14px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 18px;
-    transition: transform 0.2s;
-  }
-  #chatSendBtn:hover { transform: scale(1.05); }
-  #chatSendBtn:disabled { background: #ccc; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -483,11 +363,6 @@
 <div id="cartIcon">🛒<span id="cartCount">0</span></div>
 <div id="pedidoFloatBtn" onclick="abrirModalPedido()">
   📝
-</div>
-
-<!-- Botón flotante chat -->
-<div id="chatFloatBtn" onclick="toggleChat()">
-  🤖
 </div>
 
 
@@ -593,21 +468,6 @@
 </div>
 
 
-<!-- Panel Chat -->
-<div id="chatPanel">
-  <div class="chat-header">
-    <h3>🤖 Asistente</h3>
-    <button class="close-cart" onclick="toggleChat()">Cerrar</button>
-  </div>
-  <div id="chatMessages">
-    <div class="chat-bubble bot">¡Hola! ¿En qué te puedo ayudar?</div>
-  </div>
-  <div class="chat-input-area">
-    <textarea id="chatInput" placeholder="Escribe tu pregunta..." rows="2"></textarea>
-    <button id="chatSendBtn" onclick="enviarMensaje()">➤</button>
-  </div>
-</div>
-
 <div id="toast"></div>
 
 <div id="lightbox">
@@ -618,7 +478,8 @@
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxFf-bL3pSfKfZwWIiem0nfrcJVAUUblopRy72XfP6zHE4IqD9CqPgB9ozS5FW30RVKLw/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzumlTHwgMOANtajyuNe-TSW5CZzMXge8F1xPd-oZDRVg6wpWOWmYkCfelXvlKbBGNG8Q/exec";
+                                                              
 
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
@@ -679,7 +540,7 @@
 
       if (!name) return;
 
-      productosData.push({ name, stock, price, priceDesc, foto, relacionados });
+      productosData.push({ name, code, info, stock, price, priceDesc, foto, relacionados });
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
@@ -706,18 +567,20 @@
       `;
 
       card.querySelector(".add-btn").onclick = () => {
-        const currentStock = productosData.find(p => p.name === name)?.stock || 0;
-        const inCart = cart.find(p => p.name === name)?.qty || 0;
+        const prod = productosData.find(p => p.code === code);
+        const currentStock = prod?.stock || 0;
+        const inCart = cart.filter(p => p.code === code).reduce((s, p) => s + p.qty, 0);
         if (inCart >= currentStock) {
           showToast(`⚠️ No hay más stock disponible de "${name}"`);
           return;
         }
-        addToCart(name, card.querySelector("select").value);
+        addToCart(name, card.querySelector("select").value, code, info);
       };
 
       card.querySelector(".copy-btn").onclick = () => {
         const val = card.querySelector("select").value;
-        navigator.clipboard.writeText(`${name} - ${formatCurrency(val)}`);
+        const texto = buildProductLabel(code, name, info);
+        navigator.clipboard.writeText(`${buildProductLabel(code, name, info)} - ${formatCurrency(val)}`);
         card.querySelector(".copy-btn").textContent = "✅ Copiado";
         setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
       };
@@ -896,70 +759,79 @@
   cartIcon.onclick = () => cartPanel.classList.toggle("open");
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
 
-  function addToCart(name, price) {
-  const existing = cart.find(p => p.name === name && p.price == price);
-  if (existing) existing.qty++;
-  else cart.push({ name, price: parseFloat(price), qty: 1 });
-  updateCartDisplay();
-  animateCartCount();
-  mostrarSugerencias(name);
+  
+
+
+  function addToCart(name, price, code = "", info = "") {
+    const label = buildProductLabel(code, name, info);
+    const existing = cart.find(p => p.code === code && p.price == price);
+    if (existing) existing.qty++;
+    else cart.push({ code, name, info, label, price: parseFloat(price), qty: 1 });
+    updateCartDisplay();
+    animateCartCount();
+    mostrarSugerencias(code);
 }
 
-  function mostrarSugerencias(name) {
-    const producto = productosData.find(p => p.name === name);
-    const panel = document.getElementById("sugerenciasPanel");
 
-    if (!producto || producto.relacionados.length === 0) {
-      panel.style.display = "none";
-      return;
-    }
+function buildProductLabel(code, name, info) {
+  return [code, name, info].filter(Boolean).join(" ");
+}
 
-    const relacionados = producto.relacionados
-      .map(r => productosData.find(p => p.name === r))
-      .filter(p => p && p.stock > 0 && !cart.find(c => c.name === p.name));
+function mostrarSugerencias(code) {
+  const producto = productosData.find(p => p.code === code);
+  const panel = document.getElementById("sugerenciasPanel");
 
-    if (relacionados.length === 0) {
-      panel.style.display = "none";
-      return;
-    }
-
-    panel.style.display = "block";
-    panel.innerHTML = `
-      <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
-        💡 También te recomendamos:
-      </p>
-      ${relacionados.map(p => {
-        const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
-        const fotoUrl = p.foto ? githubRaw(p.foto) : "";
-        return `
-          <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
-                      border-radius:8px; padding:8px; margin-bottom:6px;">
-            ${fotoUrl
-              ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;
-                  border-radius:6px; flex-shrink:0;">`
-              : `<div style="width:48px; height:48px; background:#eee; border-radius:6px;
-                  display:flex; align-items:center; justify-content:center; font-size:20px;">📦</div>`
-            }
-            <div style="flex:1; min-width:0;">
-              <p style="margin:0; font-size:12px; font-weight:bold; color:#333;
-                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${p.name}
-              </p>
-              <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
-                ${formatCurrency(precioMostrar)}
-              </p>
-            </div>
-            <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}')"
-                    style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
-                          border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
-                          font-size:12px; flex-shrink:0;">
-              + Agregar
-            </button>
-          </div>
-        `;
-      }).join("")}
-    `;
+  if (!producto || producto.relacionados.length === 0) {
+    panel.style.display = "none";
+    return;
   }
+
+  const relacionados = producto.relacionados
+    .map(r => productosData.find(p => p.name === r))
+    .filter(p => p && p.stock > 0 && !cart.find(c => c.code === p.code));
+
+  if (relacionados.length === 0) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
+      💡 También te recomendamos:
+    </p>
+    ${relacionados.map(p => {
+      const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
+      const fotoUrl = p.foto ? githubRaw(p.foto) : "";
+      return `
+        <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
+                    border-radius:8px; padding:8px; margin-bottom:6px;">
+          ${fotoUrl
+            ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;
+                border-radius:6px; flex-shrink:0;">`
+            : `<div style="width:48px; height:48px; background:#eee; border-radius:6px;
+                display:flex; align-items:center; justify-content:center; font-size:20px;">📦</div>`
+          }
+          <div style="flex:1; min-width:0;">
+            <p style="margin:0; font-size:12px; font-weight:bold; color:#333;
+                      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${p.name}
+            </p>
+            <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
+              ${formatCurrency(precioMostrar)}
+            </p>
+          </div>
+          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '${(p.info || "").replace(/'/g,"\\'")}')"
+                  style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
+                        border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
+                        font-size:12px; flex-shrink:0;">
+            + Agregar
+          </button>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
 
   function updateCartDisplay() {
     cartItemsDiv.innerHTML = "";
@@ -969,7 +841,7 @@
       row.className = "cart-row";
       total += item.qty * item.price;
       row.innerHTML = `
-        <span>${item.name} x${item.qty}</span>
+        <span>${item.label} x${item.qty}</span>
         <span>${formatCurrency(item.price * item.qty)}</span>
         <button class="remove-item">🗑️</button>
       `;
@@ -1022,7 +894,9 @@
 
   const data = {
     items: cart.map(i => ({
+      code: i.code,
       name: i.name,
+      label: i.label,
       qty: parseInt(i.qty),
       price: Math.round(parseFloat(i.price))
     }))
@@ -1148,7 +1022,7 @@ function parseFechaSheet(val) {
     let total = 0;
     cart.forEach(i => {
       total += i.qty * i.price;
-      table.innerHTML += `<tr><td>${i.name}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
+      table.innerHTML += `<tr><td>${i.label}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
     });
     table.innerHTML += `<tr><th colspan=2>Total</th><th>${formatCurrency(total)}</th></tr>`;
     document.getElementById("summaryModal").style.display = "flex";
@@ -1158,7 +1032,7 @@ function parseFechaSheet(val) {
 
   document.getElementById("copySummaryBtn").onclick = () => {
     let text = "🧾 Resumen del pedido:\n";
-    cart.forEach(i => text += `- ${i.name} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
+    cart.forEach(i => text += `- ${i.label} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
     text += `TOTAL: ${formatCurrency(cart.reduce((s,i) => s + i.qty * i.price, 0))}`;
     navigator.clipboard.writeText(text);
     showToast("✅ Resumen copiado al portapapeles");
@@ -1203,61 +1077,6 @@ document.getElementById("lightbox-close").onclick = e => {
 lightbox.onclick = cerrarLightbox;
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") cerrarLightbox();
-});
-
-// =====================
-// CHAT WEBSOCKET
-// =====================
-const chatPanel = document.getElementById("chatPanel");
-const chatMessages = document.getElementById("chatMessages");
-const chatInput = document.getElementById("chatInput");
-const chatSendBtn = document.getElementById("chatSendBtn");
-
-function toggleChat() {
-  chatPanel.classList.toggle("open");
-}
-
-function agregarBurbuja(texto, tipo) {
-  const burbuja = document.createElement("div");
-  burbuja.className = `chat-bubble ${tipo}`;
-  burbuja.textContent = texto;
-  chatMessages.appendChild(burbuja);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  return burbuja;
-}
-
-async function enviarMensaje() {
-  const texto = chatInput.value.trim();
-  if (!texto) return;
-
-  // Muestra mensaje del usuario
-  agregarBurbuja(texto, "user");
-  chatInput.value = "";
-  chatSendBtn.disabled = true;
-
-  // Muestra indicador de escritura
-  const typing = agregarBurbuja("Escribiendo...", "typing");
-
-  try {
-    // Aquí irá la llamada al WebSocket cuando esté listo el backend
-    // Por ahora simula una respuesta
-    await new Promise(r => setTimeout(r, 1200));
-    typing.remove();
-    agregarBurbuja("El backend aún no está conectado. Próximamente disponible.", "bot");
-  } catch (err) {
-    typing.remove();
-    agregarBurbuja("❌ Error al conectar con el asistente.", "bot");
-  }
-
-  chatSendBtn.disabled = false;
-}
-
-// Enviar con Enter (Shift+Enter para nueva línea)
-chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    enviarMensaje();
-  }
 });
 
 </script>

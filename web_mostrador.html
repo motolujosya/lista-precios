@@ -540,7 +540,7 @@
 
       if (!name) return;
 
-      productosData.push({ name, stock, price, priceDesc, foto, relacionados });
+      productosData.push({ name, code, info, stock, price, priceDesc, foto, relacionados });
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
@@ -567,13 +567,14 @@
       `;
 
       card.querySelector(".add-btn").onclick = () => {
-        const currentStock = productosData.find(p => p.name === name)?.stock || 0;
-        const inCart = cart.find(p => p.name === name)?.qty || 0;
+        const prod = productosData.find(p => p.code === code);
+        const currentStock = prod?.stock || 0;
+        const inCart = cart.filter(p => p.code === code).reduce((s, p) => s + p.qty, 0);
         if (inCart >= currentStock) {
           showToast(`⚠️ No hay más stock disponible de "${name}"`);
           return;
         }
-        addToCart(name, card.querySelector("select").value);
+        addToCart(name, card.querySelector("select").value, code, info);
       };
 
       card.querySelector(".copy-btn").onclick = () => {
@@ -757,70 +758,79 @@
   cartIcon.onclick = () => cartPanel.classList.toggle("open");
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
 
-  function addToCart(name, price) {
-  const existing = cart.find(p => p.name === name && p.price == price);
-  if (existing) existing.qty++;
-  else cart.push({ name, price: parseFloat(price), qty: 1 });
-  updateCartDisplay();
-  animateCartCount();
-  mostrarSugerencias(name);
+  
+
+
+  function addToCart(name, price, code = "", info = "") {
+    const label = buildProductLabel(code, name, info);
+    const existing = cart.find(p => p.code === code && p.price == price);
+    if (existing) existing.qty++;
+    else cart.push({ code, name, info, label, price: parseFloat(price), qty: 1 });
+    updateCartDisplay();
+    animateCartCount();
+    mostrarSugerencias(code);
 }
 
-  function mostrarSugerencias(name) {
-    const producto = productosData.find(p => p.name === name);
-    const panel = document.getElementById("sugerenciasPanel");
 
-    if (!producto || producto.relacionados.length === 0) {
-      panel.style.display = "none";
-      return;
-    }
+function buildProductLabel(code, name, info) {
+  return [code, name, info].filter(Boolean).join(" ");
+}
 
-    const relacionados = producto.relacionados
-      .map(r => productosData.find(p => p.name === r))
-      .filter(p => p && p.stock > 0 && !cart.find(c => c.name === p.name));
+function mostrarSugerencias(code) {
+  const producto = productosData.find(p => p.code === code);
+  const panel = document.getElementById("sugerenciasPanel");
 
-    if (relacionados.length === 0) {
-      panel.style.display = "none";
-      return;
-    }
-
-    panel.style.display = "block";
-    panel.innerHTML = `
-      <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
-        💡 También te recomendamos:
-      </p>
-      ${relacionados.map(p => {
-        const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
-        const fotoUrl = p.foto ? githubRaw(p.foto) : "";
-        return `
-          <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
-                      border-radius:8px; padding:8px; margin-bottom:6px;">
-            ${fotoUrl
-              ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;
-                  border-radius:6px; flex-shrink:0;">`
-              : `<div style="width:48px; height:48px; background:#eee; border-radius:6px;
-                  display:flex; align-items:center; justify-content:center; font-size:20px;">📦</div>`
-            }
-            <div style="flex:1; min-width:0;">
-              <p style="margin:0; font-size:12px; font-weight:bold; color:#333;
-                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                ${p.name}
-              </p>
-              <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
-                ${formatCurrency(precioMostrar)}
-              </p>
-            </div>
-            <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}')"
-                    style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
-                          border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
-                          font-size:12px; flex-shrink:0;">
-              + Agregar
-            </button>
-          </div>
-        `;
-      }).join("")}
-    `;
+  if (!producto || producto.relacionados.length === 0) {
+    panel.style.display = "none";
+    return;
   }
+
+  const relacionados = producto.relacionados
+    .map(r => productosData.find(p => p.name === r))
+    .filter(p => p && p.stock > 0 && !cart.find(c => c.code === p.code));
+
+  if (relacionados.length === 0) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
+      💡 También te recomendamos:
+    </p>
+    ${relacionados.map(p => {
+      const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
+      const fotoUrl = p.foto ? githubRaw(p.foto) : "";
+      return `
+        <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
+                    border-radius:8px; padding:8px; margin-bottom:6px;">
+          ${fotoUrl
+            ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;
+                border-radius:6px; flex-shrink:0;">`
+            : `<div style="width:48px; height:48px; background:#eee; border-radius:6px;
+                display:flex; align-items:center; justify-content:center; font-size:20px;">📦</div>`
+          }
+          <div style="flex:1; min-width:0;">
+            <p style="margin:0; font-size:12px; font-weight:bold; color:#333;
+                      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${p.name}
+            </p>
+            <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
+              ${formatCurrency(precioMostrar)}
+            </p>
+          </div>
+          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '${(p.info || "").replace(/'/g,"\\'")}')"
+                  style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
+                        border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
+                        font-size:12px; flex-shrink:0;">
+            + Agregar
+          </button>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
 
   function updateCartDisplay() {
     cartItemsDiv.innerHTML = "";
@@ -830,7 +840,7 @@
       row.className = "cart-row";
       total += item.qty * item.price;
       row.innerHTML = `
-        <span>${item.name} x${item.qty}</span>
+        <span>${item.label} x${item.qty}</span>
         <span>${formatCurrency(item.price * item.qty)}</span>
         <button class="remove-item">🗑️</button>
       `;
@@ -883,7 +893,9 @@
 
   const data = {
     items: cart.map(i => ({
+      code: i.code,
       name: i.name,
+      label: i.label,
       qty: parseInt(i.qty),
       price: Math.round(parseFloat(i.price))
     }))
@@ -1009,7 +1021,7 @@ function parseFechaSheet(val) {
     let total = 0;
     cart.forEach(i => {
       total += i.qty * i.price;
-      table.innerHTML += `<tr><td>${i.name}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
+      table.innerHTML += `<tr><td>${i.label}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
     });
     table.innerHTML += `<tr><th colspan=2>Total</th><th>${formatCurrency(total)}</th></tr>`;
     document.getElementById("summaryModal").style.display = "flex";
@@ -1019,7 +1031,7 @@ function parseFechaSheet(val) {
 
   document.getElementById("copySummaryBtn").onclick = () => {
     let text = "🧾 Resumen del pedido:\n";
-    cart.forEach(i => text += `- ${i.name} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
+    cart.forEach(i => text += `- ${i.label} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
     text += `TOTAL: ${formatCurrency(cart.reduce((s,i) => s + i.qty * i.price, 0))}`;
     navigator.clipboard.writeText(text);
     showToast("✅ Resumen copiado al portapapeles");

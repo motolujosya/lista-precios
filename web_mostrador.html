@@ -479,7 +479,8 @@
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzumlTHwgMOANtajyuNe-TSW5CZzMXge8F1xPd-oZDRVg6wpWOWmYkCfelXvlKbBGNG8Q/exec";
-                                                              
+  
+  
 
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
@@ -623,38 +624,22 @@
   });
 
   async function cargarSugerencias() {
-
-    try {
+  try {
     const res = await fetch(APPS_SCRIPT_URL + "?action=sugerencias");
-    sugerencias = await res.json();
+    const data = await res.json();
+    sugerencias = {
+      motos: Array.isArray(data.motos) ? data.motos : [],
+      productos: Array.isArray(data.productos) ? data.productos : []
+    };
     setupAutocomplete("pedidoMoto", sugerencias.motos, "motoSuggestions");
     setupAutocomplete("pedidoProducto", sugerencias.productos, "productoSuggestions");
-    } catch(err) {
-      console.warn("Sugerencias no disponibles:", err);
-    }
-
-    const res = await fetch(
-      APPS_SCRIPT_URL + "?action=sugerencias"
-    );
-
-    sugerencias = await res.json();
-
-    // volver a conectar autocomplete
-    setupAutocomplete(
-      "pedidoMoto",
-      sugerencias.motos,
-      "motoSuggestions"
-    );
-
-    setupAutocomplete(
-      "pedidoProducto",
-      sugerencias.productos,
-      "productoSuggestions"
-    );
-    }
+  } catch(err) {
+    console.warn("Sugerencias no disponibles:", err);
+  }
+}
 
     function setupAutocomplete(inputId, list, containerId) {
-
+      const safeList = Array.isArray(list) ? list : [];  // ← solo agrega esta línea
       const input =
         document.getElementById(inputId);
 
@@ -670,7 +655,7 @@
 
         if (!value) return;
 
-        const matches = list.filter(item =>
+        const matches = safeList.filter(item =>
           item.toLowerCase().includes(value)
         );
 
@@ -695,52 +680,46 @@
       };
       }
 
-  async function guardarPedidoPendiente() {
+      async function guardarPedidoPendiente() {
+        const moto = document.getElementById("pedidoMoto").value.trim();
+        const producto = document.getElementById("pedidoProducto").value.trim();
+        const nota = document.getElementById("pedidoAdicional").value.trim();
 
-  const data = {
-    action: "guardarPedidoPendiente",
+        if (!moto || !producto) {
+          return showToast("⚠️ Completa moto y producto");
+        }
 
-    proveedor: "",
+        const data = {
+          action: "guardarPedidoPendiente",
+          proveedor: "",
+          moto,
+          producto,
+          nota
+        };
 
-    moto: document.getElementById("pedidoMoto").value,
+        try {
+          const res = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(data)
+          });
 
-    producto: document.getElementById("pedidoProducto").value,
+          const result = await res.json();
+          if (!res.ok || result.error) {
+            throw new Error(result.error || "Error del servidor");
+          }
 
-    nota: document.getElementById("pedidoAdicional").value
-  };
+          showToast("✅ Guardado correctamente");
+          document.getElementById("pedidoModal").style.display = "none";
+          document.getElementById("pedidoMoto").value = "";
+          document.getElementById("pedidoProducto").value = "";
+          document.getElementById("pedidoAdicional").value = "";
+          await cargarSugerencias();
 
-  try {
-
-    await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-
-      mode: "no-cors",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify(data)
-    });
-
-    showToast("✅ Guardado correctamente");
-
-    document.getElementById("pedidoModal").style.display = "none";
-
-    document.getElementById("pedidoMoto").value = "";
-
-    document.getElementById("pedidoProducto").value = "";
-
-    document.getElementById("pedidoAdicional").value = "";
-
-    cargarSugerencias();
-
-  } catch(err) {
-
-    console.error(err);
-
-    alert("❌ Error al guardar");
-  }
+        } catch (err) {
+          console.error(err);
+          alert("❌ Error al guardar: " + err.message);
+        }
 }
 
   function filterProducts() {

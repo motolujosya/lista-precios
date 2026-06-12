@@ -635,20 +635,6 @@
     }
 
 
-    sugerencias = await res.json();
-
-    // volver a conectar autocomplete
-    setupAutocomplete(
-      "pedidoMoto",
-      sugerencias.motos,
-      "motoSuggestions"
-    );
-
-    setupAutocomplete(
-      "pedidoProducto",
-      sugerencias.productos,
-      "productoSuggestions"
-    );
     }
 
     function setupAutocomplete(inputId, list, containerId) {

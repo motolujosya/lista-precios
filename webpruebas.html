@@ -1213,7 +1213,7 @@ const clientId = crypto.randomUUID();
 let typingBubble = null;
 
 // Conexión al WebSocket del backend
-const ws = new WebSocket(`ws://localhost:8000/ws/${clientId}`);
+const ws = new WebSocket(`https://smoked-portly-slot.ngrok-free.dev/ws/${clientId}`);
 
 ws.onopen = () => {
   console.log("✅ Conectado al chat:", clientId);

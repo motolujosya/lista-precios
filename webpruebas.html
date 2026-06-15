@@ -672,6 +672,7 @@
       const foto = obj["foto"];
       const link = obj["links"];
       const code = obj["codigo"];
+      const marca = obj["marca"] || "";
       const stock = parseInt(obj["inventario"]) || 0;
       const rel1 = obj["relacionado1"] || "";
       const rel2 = obj["relacionado2"] || "";
@@ -695,6 +696,7 @@
       card.innerHTML = `
         ${imgHtml}
         <h4>${name}</h4>
+        <p style="color:#888; font-size:13px; margin: 2px 0 6px 0;"><em>${marca}</em></p>
         <p><strong>Código:</strong> ${code || "—"}</p>
         <p>${info || ""}</p>
         <p class="${stockClass}">${stockLabel}</p>

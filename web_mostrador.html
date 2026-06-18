@@ -506,10 +506,12 @@
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
   <!-- NUEVO: Calculadora de cambio -->
   <div id="pagoCalculadora" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
       <label for="pagoCliente" style="font-size: 13px; font-weight: bold; color: #555;">Paga con:</label>
       <input id="pagoCliente" type="number" placeholder="0" style="width: 120px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; text-align: right;">
     </div>
+    <div id="pagoFormateado" style="text-align: right; font-size: 11px; color: #888; margin-bottom: 8px;">$0</div>
+
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <span style="font-size: 13px; font-weight: bold; color: #555;">Cambio:</span>
       <span id="cambioCliente" style="font-size: 14px; font-weight: bold; color: #28a745;">$0</span>
@@ -996,10 +998,13 @@ function mostrarSugerencias(code) {
 
     // NUEVO: Calcular cambio dinámicamente
     const inputPago = document.getElementById("pagoCliente");
+    const txtFormateado = document.getElementById("pagoFormateado");
     const txtCambio = document.getElementById("cambioCliente");
     
     function calcularCambio() {
       const pago = parseFloat(inputPago.value) || 0;
+      // Actualiza la ayuda visual de los miles abajo del input
+      txtFormateado.textContent = formatCurrency(pago);
       if (pago > 0 && pago >= total) {
         txtCambio.textContent = formatCurrency(pago - total);
         txtCambio.style.color = "#28a745"; // Verde si cubre el total

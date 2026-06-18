@@ -504,6 +504,17 @@
   </div>
   <div id="cartItems"></div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+  <!-- NUEVO: Calculadora de cambio -->
+  <div id="pagoCalculadora" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <label for="pagoCliente" style="font-size: 13px; font-weight: bold; color: #555;">Paga con:</label>
+      <input id="pagoCliente" type="number" placeholder="0" style="width: 120px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; text-align: right;">
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 13px; font-weight: bold; color: #555;">Cambio:</span>
+      <span id="cambioCliente" style="font-size: 14px; font-weight: bold; color: #28a745;">$0</span>
+    </div>
+  </div>
   <div id="sugerenciasPanel" style="display:none; margin-top:12px; padding-top:10px;
      border-top:1px solid #eee;"></div>
   <div class="cart-actions">
@@ -982,6 +993,24 @@ function mostrarSugerencias(code) {
     });
     document.getElementById("cartTotal").textContent = formatCurrency(total);
     updateCartCount();
+
+    // NUEVO: Calcular cambio dinámicamente
+    const inputPago = document.getElementById("pagoCliente");
+    const txtCambio = document.getElementById("cambioCliente");
+    
+    function calcularCambio() {
+      const pago = parseFloat(inputPago.value) || 0;
+      if (pago > 0 && pago >= total) {
+        txtCambio.textContent = formatCurrency(pago - total);
+        txtCambio.style.color = "#28a745"; // Verde si cubre el total
+      } else {
+        txtCambio.textContent = "$0";
+        txtCambio.style.color = "#dc3545"; // Rojo si falta dinero o es 0
+      }
+    }
+    
+    inputPago.oninput = calcularCambio;
+    calcularCambio(); // Ejecutar al actualizar el carrito
   }
 
   function updateCartCount() {
@@ -999,6 +1028,7 @@ function mostrarSugerencias(code) {
     if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
       cart = [];
       updateCartDisplay();
+      document.getElementById("pagoCliente").value = "";
       showToast("🗑️ Carrito vaciado.");
       document.getElementById("sugerenciasPanel").style.display = "none";
     }
@@ -1039,6 +1069,7 @@ function mostrarSugerencias(code) {
     showToast("✅ ¡Compra finalizada! Inventario actualizado.");
     cart = [];
     updateCartDisplay();
+    document.getElementById("pagoCliente").value = "";
     cartPanel.classList.remove("open");
     setTimeout(() => location.reload(), 2000);
 

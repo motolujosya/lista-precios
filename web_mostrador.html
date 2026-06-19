@@ -1033,7 +1033,12 @@ function mostrarSugerencias(code) {
     if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
       cart = [];
       updateCartDisplay();
-      document.getElementById("pagoCliente").value = "";
+
+      // Limpia el input y fuerza a que se recalculen el texto gris y el cambio
+      const inputPago = document.getElementById("pagoCliente");
+      inputPago.value = "";
+      if (typeof inputPago.oninput === "function") inputPago.oninput();
+
       showToast("🗑️ Carrito vaciado.");
       document.getElementById("sugerenciasPanel").style.display = "none";
     }
@@ -1074,7 +1079,12 @@ function mostrarSugerencias(code) {
     showToast("✅ ¡Compra finalizada! Inventario actualizado.");
     cart = [];
     updateCartDisplay();
-    document.getElementById("pagoCliente").value = "";
+
+    // Limpia el input y actualiza los textos visuales tras la compra
+    const inputPago = document.getElementById("pagoCliente");
+    inputPago.value = "";
+    if (typeof inputPago.oninput === "function") inputPago.oninput();
+    
     cartPanel.classList.remove("open");
     setTimeout(() => location.reload(), 2000);
 

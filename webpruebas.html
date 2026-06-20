@@ -441,6 +441,46 @@
     font-style: italic;
   }
 
+  /* Tarjeta de producto dentro del chat */
+  .chat-product-card {
+    align-self: flex-start;
+    max-width: 90%;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .chat-product-card .cp-nombre {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+  .chat-product-card .cp-row {
+    display: flex;
+    justify-content: space-between;
+    color: #555;
+    padding: 2px 0;
+  }
+  .chat-product-card .cp-row span:first-child {
+    color: #888;
+  }
+  .chat-product-card .cp-precio {
+    color: #6f42c1;
+    font-weight: 600;
+  }
+  .chat-product-card .cp-stock-ok { color: #22a55a; font-weight: 600; }
+  .chat-product-card .cp-stock-no { color: #e0414d; font-weight: 600; }
+  .chat-product-card .cp-info {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #eee;
+    color: #777;
+    font-size: 12px;
+  }
+
   .chat-input-area {
     display: flex;
     gap: 8px;
@@ -1287,12 +1327,25 @@ ws.onmessage = (event) => {
       typingBubble.textContent = datos.message;
     }
   } else if (datos.status === "completed") {
-    // Quita la burbuja de "escribiendo..." y muestra la respuesta final
+    // Quita la burbuja de "escribiendo..."
     if (typingBubble) {
       typingBubble.remove();
       typingBubble = null;
     }
-    agregarBurbuja(datos.response, "bot");
+
+    // Si vienen productos estructurados, se muestran como tarjetas
+    if (Array.isArray(datos.productos) && datos.productos.length > 0) {
+      if (datos.response_text) {
+        agregarBurbuja(datos.response_text, "bot");
+      }
+      datos.productos.forEach(p => agregarTarjetaProducto(p));
+    } else if (datos.response) {
+      // Compatibilidad con respuestas de solo texto
+      agregarBurbuja(datos.response, "bot");
+    } else if (datos.response_text) {
+      agregarBurbuja(datos.response_text, "bot");
+    }
+
     chatSendBtn.disabled = false;
   }
 };
@@ -1308,6 +1361,29 @@ function agregarBurbuja(texto, tipo) {
   chatMessages.appendChild(burbuja);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return burbuja;
+}
+
+function agregarTarjetaProducto(p) {
+  const tarjeta = document.createElement("div");
+  tarjeta.className = "chat-product-card";
+
+  const stock = Number(p.stock) || 0;
+  const stockClase = stock > 0 ? "cp-stock-ok" : "cp-stock-no";
+  const stockTexto = stock > 0 ? `${stock} disponibles` : "Sin stock";
+
+  const precioFormateado = Number(p.precio || 0).toLocaleString("es-CO");
+
+  tarjeta.innerHTML = `
+    <div class="cp-nombre">${p.nombre ?? "Producto"}</div>
+    <div class="cp-row"><span>Código</span><span>${p.codigo ?? "-"}</span></div>
+    <div class="cp-row"><span>Precio</span><span class="cp-precio">$${precioFormateado}</span></div>
+    <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
+    ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
+  `;
+
+  chatMessages.appendChild(tarjeta);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return tarjeta;
 }
 
 function enviarMensaje() {

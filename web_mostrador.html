@@ -1301,7 +1301,7 @@ const clientId = crypto.randomUUID();
 let typingBubble = null;
 
 // Conexión al WebSocket del backend
-const ws = new WebSocket(`wss://34.70.236.21/ws/${clientId}`);
+const ws = new WebSocket(`ws://34.70.236.21:8000/ws/${clientId}`);
 
 ws.onopen = () => {
   console.log("✅ Conectado al chat:", clientId);

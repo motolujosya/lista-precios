@@ -481,6 +481,17 @@
     font-size: 12px;
   }
 
+  .chat-product-card .cp-marca {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+.chat-product-card .cp-precio-taller {
+  color: #28a745;   /* verde, diferente al morado del precio público */
+  font-weight: 600;
+}
+
   .chat-input-area {
     display: flex;
     gap: 8px;
@@ -1363,6 +1374,7 @@ function agregarBurbuja(texto, tipo) {
   return burbuja;
 }
 
+
 function agregarTarjetaProducto(p) {
   const tarjeta = document.createElement("div");
   tarjeta.className = "chat-product-card";
@@ -1372,14 +1384,18 @@ function agregarTarjetaProducto(p) {
   const stockTexto = stock > 0 ? `${stock} disponibles` : "Sin stock";
 
   const precioFormateado = Number(p.precio || 0).toLocaleString("es-CO");
+  const precioTallerFormateado = Number(p.precio_taller || 0).toLocaleString("es-CO"); // ← AGREGAR
+
 
   tarjeta.innerHTML = `
-    <div class="cp-nombre">${p.nombre ?? "Producto"}</div>
-    <div class="cp-row"><span>Código</span><span>${p.codigo ?? "-"}</span></div>
-    <div class="cp-row"><span>Precio</span><span class="cp-precio">$${precioFormateado}</span></div>
-    <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
-    ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
-  `;
+  <div class="cp-nombre">${p.nombre ?? "Producto"}</div>
+  <div class="cp-marca">${p.marca ?? ""}</div>                                  ← NUEVO
+  <div class="cp-row"><span>Código</span><span>${p.codigo ?? "-"}</span></div>
+  <div class="cp-row"><span>Precio</span><span class="cp-precio">$${precioFormateado}</span></div>
+  ${p.precio_taller ? `<div class="cp-row"><span>Precio taller</span><span class="cp-precio-taller">$${precioTallerFormateado}</span></div>` : ""}   ← NUEVO
+  <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
+  ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
+`;
 
   chatMessages.appendChild(tarjeta);
   chatMessages.scrollTop = chatMessages.scrollHeight;

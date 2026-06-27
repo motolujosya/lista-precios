@@ -1154,7 +1154,12 @@ function mostrarSugerencias(code) {
     if (typeof inputPago.oninput === "function") inputPago.oninput();
     
     cartPanel.classList.remove("open");
-    setTimeout(() => location.reload(), 2000);
+    // Recarga solo el catálogo sin destruir el WebSocket
+    setTimeout(() => {
+      const s = document.createElement('script');
+      s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&_=${Date.now()}`;
+      document.head.appendChild(s);
+    }, 2000);
 
   } catch (err) {
     console.error("❌ Error completo:", err);
@@ -1327,56 +1332,78 @@ const clientId = crypto.randomUUID();
 
 // Burbuja "escribiendo..." que se actualiza/elimina dinámicamente
 let typingBubble = null;
+let ws = null;
+let wsReconectando = false;
+let pingInterval = null;
 
-// Conexión al WebSocket del backend
-const ws = new WebSocket(`wss://smoked-portly-slot.ngrok-free.dev/ws/${clientId}`);
+function conectarWS() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-ws.onopen = () => {
-  console.log("✅ Conectado al chat:", clientId);
-};
+  ws = new WebSocket(`wss://smoked-portly-slot.ngrok-free.dev/ws/${clientId}`);
 
-ws.onclose = () => {
-  console.log("❌ Conexión de chat cerrada");
-};
+  ws.onopen = () => {
+    console.log("✅ Conectado al chat:", clientId);
+    wsReconectando = false;
+    clearInterval(pingInterval);
+    // Ping cada 25s para evitar que el servidor/proxy cierre la conexión por inactividad
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send("__ping__");
+    }, 25000);
+  };
 
-ws.onerror = (err) => {
-  console.error("Error en WebSocket:", err);
-};
-
-// Cuando llega un mensaje desde el backend (vía Redis Pub/Sub)
-ws.onmessage = (event) => {
-  const datos = JSON.parse(event.data);
-
-  if (datos.status === "typing") {
-    // Muestra/actualiza la burbuja de "escribiendo..."
-    if (!typingBubble) {
-      typingBubble = agregarBurbuja(datos.message, "typing");
-    } else {
-      typingBubble.textContent = datos.message;
+  ws.onclose = () => {
+    console.warn("⚠️ WebSocket cerrado. Reconectando en 3s...");
+    clearInterval(pingInterval);
+    if (!wsReconectando) {
+      wsReconectando = true;
+      setTimeout(conectarWS, 3000);
     }
-  } else if (datos.status === "completed") {
-    // Quita la burbuja de "escribiendo..."
-    if (typingBubble) {
-      typingBubble.remove();
-      typingBubble = null;
-    }
+  };
 
-    // Si vienen productos estructurados, se muestran como tarjetas
-    if (Array.isArray(datos.productos) && datos.productos.length > 0) {
-      if (datos.response_text) {
+  ws.onerror = (err) => {
+    console.error("Error en WebSocket:", err);
+    ws.close();
+  };
+
+  // Cuando llega un mensaje desde el backend (vía Redis Pub/Sub)
+  ws.onmessage = (event) => {
+    if (event.data === "__pong__") return; // ignorar respuesta de ping
+    const datos = JSON.parse(event.data);
+
+    if (datos.status === "typing") {
+      // Muestra/actualiza la burbuja de "escribiendo..."
+      if (!typingBubble) {
+        typingBubble = agregarBurbuja(datos.message, "typing");
+      } else {
+        typingBubble.textContent = datos.message;
+      }
+    } else if (datos.status === "completed") {
+      // Quita la burbuja de "escribiendo..."
+      if (typingBubble) {
+        typingBubble.remove();
+        typingBubble = null;
+      }
+
+      // Si vienen productos estructurados, se muestran como tarjetas
+      if (Array.isArray(datos.productos) && datos.productos.length > 0) {
+        if (datos.response_text) {
+          agregarBurbuja(datos.response_text, "bot");
+        }
+        datos.productos.forEach(p => agregarTarjetaProducto(p));
+      } else if (datos.response) {
+        // Compatibilidad con respuestas de solo texto
+        agregarBurbuja(datos.response, "bot");
+      } else if (datos.response_text) {
         agregarBurbuja(datos.response_text, "bot");
       }
-      datos.productos.forEach(p => agregarTarjetaProducto(p));
-    } else if (datos.response) {
-      // Compatibilidad con respuestas de solo texto
-      agregarBurbuja(datos.response, "bot");
-    } else if (datos.response_text) {
-      agregarBurbuja(datos.response_text, "bot");
-    }
 
-    chatSendBtn.disabled = false;
-  }
-};
+      chatSendBtn.disabled = false;
+    }
+  };
+}
+
+// Iniciar conexión al cargar la página
+conectarWS();
 
 function toggleChat() {
   chatPanel.classList.toggle("open");
@@ -1464,6 +1491,11 @@ function enviarMensaje() {
   chatSendBtn.disabled = true;
 
   // Envía el mensaje al backend por WebSocket
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast("⏳ Reconectando chat... intenta en un momento.");
+    conectarWS();
+    return;
+  }
   ws.send(texto);
 }
 

@@ -1389,10 +1389,10 @@ function agregarTarjetaProducto(p) {
 
   tarjeta.innerHTML = `
   <div class="cp-nombre">${p.nombre ?? "Producto"}</div>
-  <div class="cp-marca">${p.marca ?? ""}</div>                                  ← NUEVO
+  <div class="cp-marca">${p.marca ?? ""}</div>                             
   <div class="cp-row"><span>Código</span><span>${p.codigo ?? "-"}</span></div>
   <div class="cp-row"><span>Precio</span><span class="cp-precio">$${precioFormateado}</span></div>
-  ${p.precio_taller ? `<div class="cp-row"><span>Precio taller</span><span class="cp-precio-taller">$${precioTallerFormateado}</span></div>` : ""}   ← NUEVO
+  ${p.precio_taller ? `<div class="cp-row"><span>Precio taller</span><span class="cp-precio-taller">$${precioTallerFormateado}</span></div>` : ""} 
   <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
   ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
 `;

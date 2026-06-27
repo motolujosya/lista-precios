@@ -468,7 +468,7 @@
     color: #888;
   }
   .chat-product-card .cp-precio {
-    color: #6f42c1;
+    color: #28a745;
     font-weight: 600;
   }
   .chat-product-card .cp-stock-ok { color: #22a55a; font-weight: 600; }
@@ -488,8 +488,25 @@
   font-style: italic;
 }
 .chat-product-card .cp-precio-taller {
-  color: #28a745;   /* verde, diferente al morado del precio público */
+  color: #fd7e14;   /* naranja, diferente al verde del precio público */
   font-weight: 600;
+}
+.chat-product-card .cp-add-btn {
+  background: linear-gradient(90deg, #00b09b, #96c93d);
+  color: white;
+  border: none;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: transform 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.chat-product-card .cp-add-btn:hover { transform: scale(1.06); }
+.chat-product-card .cp-add-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+.chat-product-card .cp-add-taller {
+  background: linear-gradient(90deg, #fd7e14, #ffc107);
 }
 
   .chat-input-area {
@@ -1383,19 +1400,54 @@ function agregarTarjetaProducto(p) {
   const stockClase = stock > 0 ? "cp-stock-ok" : "cp-stock-no";
   const stockTexto = stock > 0 ? `${stock} disponibles` : "Sin stock";
 
-  const precioFormateado = Number(p.precio || 0).toLocaleString("es-CO");
-  const precioTallerFormateado = Number(p.precio_taller || 0).toLocaleString("es-CO"); // ← AGREGAR
-
+  const precioNum = Number(p.precio || 0);
+  const precioTallerNum = Number(p.precio_taller || 0);
+  const precioFormateado = precioNum.toLocaleString("es-CO");
+  const precioTallerFormateado = precioTallerNum.toLocaleString("es-CO");
 
   tarjeta.innerHTML = `
   <div class="cp-nombre">${p.nombre ?? "Producto"}</div>
-  <div class="cp-marca">${p.marca ?? ""}</div>                                  ← NUEVO
+  <div class="cp-marca">${p.marca ?? ""}</div>
   <div class="cp-row"><span>Código</span><span>${p.codigo ?? "-"}</span></div>
-  <div class="cp-row"><span>Precio</span><span class="cp-precio">$${precioFormateado}</span></div>
-  ${p.precio_taller ? `<div class="cp-row"><span>Precio taller</span><span class="cp-precio-taller">$${precioTallerFormateado}</span></div>` : ""}   ← NUEVO
+  <div class="cp-row">
+    <span>Precio</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span class="cp-precio">$${precioFormateado}</span>
+      <button class="cp-add-btn" data-precio="${precioNum}" ${stock === 0 ? "disabled" : ""}>+ Agregar</button>
+    </span>
+  </div>
+  ${p.precio_taller ? `
+  <div class="cp-row">
+    <span>Precio taller</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span class="cp-precio-taller">$${precioTallerFormateado}</span>
+      <button class="cp-add-btn cp-add-taller" data-precio="${precioTallerNum}" ${stock === 0 ? "disabled" : ""}>+ Agregar</button>
+    </span>
+  </div>` : ""}
   <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
   ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
 `;
+
+  // Eventos de los botones agregar
+  tarjeta.querySelectorAll(".cp-add-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const precio = parseFloat(btn.dataset.precio);
+      addToCart(
+        p.nombre ?? "Producto",
+        precio,
+        p.codigo ?? "",
+        p.info ?? ""
+      );
+      // Feedback visual breve
+      const original = btn.textContent;
+      btn.textContent = "✅";
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.disabled = stock === 0;
+      }, 1000);
+    });
+  });
 
   chatMessages.appendChild(tarjeta);
   chatMessages.scrollTop = chatMessages.scrollHeight;

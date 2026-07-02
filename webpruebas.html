@@ -1528,7 +1528,7 @@ let pingInterval = null;
 function conectarWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  const ws = new WebSocket(`wss://smoked-portly-slot.ngrok-free.dev/ws/${clientId}`);
+  ws = new WebSocket(`wss://smoked-portly-slot.ngrok-free.dev/ws/${clientId}`);
 
   ws.onopen = () => {
     console.log("✅ Conectado al chat:", clientId);

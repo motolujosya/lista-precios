@@ -96,6 +96,21 @@
   .copy-summary { background: #007bff; }
   .close-summary { background: #ff4d4d; }
 
+  /* Modal pedidos guardados */
+  #quotesModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #quotesContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 600px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  .close-quotes { background: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; float: right; }
+  .quote-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .quote-row .quote-info { flex: 1; min-width: 0; }
+  .quote-row .quote-info strong { display: block; color: #333; }
+  .quote-row .quote-info span { font-size: 12px; color: #888; }
+  .quote-row .quote-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .load-quote-btn { background: linear-gradient(90deg, #00b09b, #96c93d); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .delete-quote-btn { background: linear-gradient(90deg, #ff4d4d, #ff6a00); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .save-quote-btn { background: linear-gradient(90deg, #6c5ce7, #a29bfe) !important; }
+  .quotes-btn { background: linear-gradient(90deg, #6c5ce7, #a29bfe); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
+  .quotes-btn:hover { transform: scale(1.02); }
+
   /* Modal historial */
   #historialModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
   #historialContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 700px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
@@ -560,6 +575,7 @@
 
 
 <button class="historial-btn" onclick="verHistorial()">📋 Ver historial de ventas</button>
+<button class="quotes-btn" onclick="abrirPedidosGuardados()">📁 Pedidos guardados</button>
 
 <div class="product-grid" id="productGrid"></div>
 
@@ -589,8 +605,18 @@
      border-top:1px solid #eee;"></div>
   <div class="cart-actions">
     <button id="viewSummaryBtn" class="summary-btn">🧾 Resumen</button>
+    <button id="saveQuoteBtn" class="summary-btn save-quote-btn">💾 Guardar pedido</button>
     <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar</button>
     <button id="checkoutBtn" class="checkout-btn">✅ Finalizar compra</button>
+  </div>
+</div>
+
+<!-- Modal Pedidos Guardados -->
+<div id="quotesModal">
+  <div id="quotesContent">
+    <button class="close-quotes" onclick="document.getElementById('quotesModal').style.display='none'">✖ Cerrar</button>
+    <h3>📁 Pedidos guardados</h3>
+    <div id="quotesList" style="margin-top:14px;"></div>
   </div>
 </div>
 
@@ -1096,6 +1122,93 @@ function mostrarSugerencias(code) {
     cartCount.style.animation = "pop 0.3s ease";
   }
 
+  // 💾 Pedidos guardados (cotizaciones) — se guardan en este navegador
+  const QUOTES_KEY = "pedidosGuardados";
+
+  function getSavedQuotes() {
+    try {
+      return JSON.parse(localStorage.getItem(QUOTES_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function setSavedQuotes(quotes) {
+    localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
+  }
+
+  document.getElementById("saveQuoteBtn").onclick = () => {
+    if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+    const nombre = prompt("Nombre o referencia para este pedido (ej: cliente, moto, etc.):", "");
+    if (nombre === null) return; // canceló
+
+    const quotes = getSavedQuotes();
+    const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+    quotes.push({
+      id: Date.now(),
+      nombre: nombre.trim() || "Sin nombre",
+      fecha: new Date().toLocaleString(),
+      total,
+      items: JSON.parse(JSON.stringify(cart))
+    });
+    setSavedQuotes(quotes);
+    showToast("💾 Pedido guardado. Puedes recuperarlo en 'Pedidos guardados'.");
+  };
+
+  function abrirPedidosGuardados() {
+    renderQuotesList();
+    document.getElementById("quotesModal").style.display = "flex";
+  }
+
+  function renderQuotesList() {
+    const quotes = getSavedQuotes();
+    const list = document.getElementById("quotesList");
+
+    if (quotes.length === 0) {
+      list.innerHTML = `<p style="text-align:center; color:#888;">No tienes pedidos guardados.</p>`;
+      return;
+    }
+
+    list.innerHTML = [...quotes].reverse().map(q => {
+      const cantidadItems = q.items.reduce((s, i) => s + i.qty, 0);
+      return `
+        <div class="quote-row">
+          <div class="quote-info">
+            <strong>${q.nombre}</strong>
+            <span>${q.fecha} · ${cantidadItems} producto(s) · ${formatCurrency(q.total)}</span>
+          </div>
+          <div class="quote-actions">
+            <button class="load-quote-btn" onclick="cargarPedidoGuardado(${q.id})">📥 Cargar</button>
+            <button class="delete-quote-btn" onclick="eliminarPedidoGuardado(${q.id})">🗑️</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function cargarPedidoGuardado(id) {
+    const quotes = getSavedQuotes();
+    const quote = quotes.find(q => q.id === id);
+    if (!quote) return;
+
+    if (cart.length > 0) {
+      if (!confirm("Esto reemplazará el carrito actual por el pedido guardado. ¿Continuar?")) return;
+    }
+
+    cart = JSON.parse(JSON.stringify(quote.items));
+    updateCartDisplay();
+    document.getElementById("quotesModal").style.display = "none";
+    cartPanel.classList.add("open");
+    showToast(`📥 Pedido "${quote.nombre}" cargado en el carrito.`);
+  }
+
+  function eliminarPedidoGuardado(id) {
+    if (!confirm("¿Eliminar este pedido guardado?")) return;
+    const quotes = getSavedQuotes().filter(q => q.id !== id);
+    setSavedQuotes(quotes);
+    renderQuotesList();
+  }
+
   document.getElementById("clearCartBtn").onclick = () => {
     if (cart.length === 0) return showToast("El carrito ya está vacío.");
     if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
@@ -1339,7 +1452,7 @@ let pingInterval = null;
 function conectarWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  ws = new WebSocket(`wss://henry-acting-begin-assessing.trycloudflare.com/ws/${clientId}`);
+  const ws = new WebSocket(`wss://henry-acting-begin-assessing.trycloudflare.com/ws/${clientId}`);
 
   ws.onopen = () => {
     console.log("✅ Conectado al chat:", clientId);

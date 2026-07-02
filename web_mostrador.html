@@ -8,11 +8,36 @@
   h2 { text-align: center; margin: 20px 0; color: #007bff; }
   #search { display: block; margin: 10px auto; padding: 8px; width: 80%; border-radius: 6px; border: 1px solid #ccc; }
 
+  .search-bar { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 10px auto; width: 80%; }
+  .search-bar #search { margin: 0; flex: 1; width: auto; }
+  #viewToggleBtn { background: #fff; color: #444; border: 1px solid #ddd; width: 38px; height: 38px; padding: 0; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, background 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  #viewToggleBtn:hover { transform: scale(1.08); background: #f2f2f2; }
+  #viewToggleBtn svg { width: 20px; height: 20px; display: block; }
+
   .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 20px; }
   .product-card { background: white; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); padding: 14px; transition: transform 0.2s, box-shadow 0.2s; }
   .product-card:hover { transform: scale(1.03); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
   .product-card h4 { color: #333; margin: 0 0 6px 0; }
   .product-card p { margin: 4px 0; }
+  .product-card .card-actions select { width: 100%; margin-bottom: 6px; padding: 4px; border-radius: 6px; border: 1px solid #ccc; }
+  .product-card .card-actions-buttons { display: flex; gap: 6px; }
+  .product-card .card-actions-buttons button { flex: 1; }
+
+  /* Vista de lista */
+  .product-grid.list-view { grid-template-columns: 1fr; gap: 10px; padding: 14px 20px; }
+  .product-grid.list-view .product-card { display: flex; align-items: center; gap: 18px; }
+  .product-grid.list-view .product-card:hover { transform: none; }
+  .product-grid.list-view .card-media { flex-shrink: 0; }
+  .product-grid.list-view .card-media .mini-foto { margin-bottom: 0; }
+  .product-grid.list-view .card-body { flex: 2; min-width: 0; }
+  .product-grid.list-view .card-body p { margin: 2px 0; }
+  .product-grid.list-view .card-actions { flex: 1; min-width: 180px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+  .product-grid.list-view .card-actions-buttons { justify-content: flex-end; }
+
+  @media (max-width: 700px) {
+    .product-grid.list-view .product-card { flex-wrap: wrap; }
+    .product-grid.list-view .card-body, .product-grid.list-view .card-actions { flex: 1 1 100%; }
+  }
 
   .stock-ok { color: #28a745; font-weight: bold; font-size: 13px; }
   .stock-low { color: #ff9800; font-weight: bold; font-size: 13px; }
@@ -562,7 +587,10 @@
 <body>
 
 <h2>🛍️ Catálogo de productos</h2>
-<input id="search" placeholder="Buscar por nombre o info..." oninput="filterProducts()">
+<div class="search-bar">
+  <input id="search" placeholder="Buscar por nombre o info..." oninput="filterProducts()">
+  <button id="viewToggleBtn" onclick="toggleView()"></button>
+</div>
 <div id="cartIcon">🛒<span id="cartCount">0</span></div>
 <div id="pedidoFloatBtn" onclick="abrirModalPedido()">
   📝
@@ -801,19 +829,25 @@
       const card = document.createElement("div");
       card.className = "product-card";
       card.innerHTML = `
-        ${imgHtml}
-        <h4>${name}</h4>
-        <p style="color:#888; font-size:13px; margin: 2px 0 6px 0;"><em>${marca}</em></p>
-        <p><strong>Código:</strong> ${code || "—"}</p>
-        <p>${info || ""}</p>
-        <p class="${stockClass}">${stockLabel}</p>
-        <select>
-          <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
-          <option value="${priceDesc}">Precio Taller: ${formatCurrency(priceDesc)}</option>
-        </select><br>
-        <button class="add-btn" ${stock === 0 ? "disabled" : ""}>Agregar</button>
-        <button class="copy-btn">Copiar</button>
-        ${link ? `<p><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
+        <div class="card-media">${imgHtml}</div>
+        <div class="card-body">
+          <h4>${name}</h4>
+          <p style="color:#888; font-size:13px; margin: 2px 0 6px 0;"><em>${marca}</em></p>
+          <p><strong>Código:</strong> ${code || "—"}</p>
+          <p>${info || ""}</p>
+          <p class="${stockClass}">${stockLabel}</p>
+        </div>
+        <div class="card-actions">
+          <select>
+            <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
+            <option value="${priceDesc}">Precio Taller: ${formatCurrency(priceDesc)}</option>
+          </select>
+          <div class="card-actions-buttons">
+            <button class="add-btn" ${stock === 0 ? "disabled" : ""}>Agregar</button>
+            <button class="copy-btn">Copiar</button>
+          </div>
+          ${link ? `<p><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
+        </div>
       `;
 
       card.querySelector(".add-btn").onclick = () => {
@@ -977,6 +1011,48 @@
       c.style.display = c.textContent.toLowerCase().includes(q) ? "" : "none";
     });
   }
+
+  // 🔀 Vista de catálogo (cuadrícula / lista)
+  let currentView = localStorage.getItem("catalogView") || "grid";
+
+  const ICON_LIST = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="4" cy="6" r="1.6" fill="#444"/>
+      <rect x="8.5" y="4.6" width="12" height="2.8" rx="1.4" fill="#444"/>
+      <circle cx="4" cy="12" r="1.6" fill="#444"/>
+      <rect x="8.5" y="10.6" width="12" height="2.8" rx="1.4" fill="#444"/>
+      <circle cx="4" cy="18" r="1.6" fill="#444"/>
+      <rect x="8.5" y="16.6" width="12" height="2.8" rx="1.4" fill="#444"/>
+    </svg>`;
+
+  const ICON_GRID = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+      <rect x="13" y="3.5" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+      <rect x="3.5" y="13" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+      <rect x="13" y="13" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+    </svg>`;
+
+  function aplicarVista() {
+    const grid = document.getElementById("productGrid");
+    const btn = document.getElementById("viewToggleBtn");
+    if (!grid) return;
+    grid.classList.toggle("list-view", currentView === "list");
+    if (btn) {
+      // El ícono mostrado representa la vista a la que se cambiará al hacer clic
+      btn.innerHTML = currentView === "grid" ? ICON_LIST : ICON_GRID;
+      btn.title = currentView === "grid" ? "Cambiar a vista de lista" : "Cambiar a vista de cuadrícula";
+    }
+  }
+
+  function toggleView() {
+    currentView = currentView === "grid" ? "list" : "grid";
+    localStorage.setItem("catalogView", currentView);
+    aplicarVista();
+    // La búsqueda no se toca: filterProducts sigue operando sobre .product-card
+  }
+
+  aplicarVista();
 
   // Carrito
   const cartIcon = document.getElementById("cartIcon");

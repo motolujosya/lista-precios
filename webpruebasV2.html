@@ -157,17 +157,32 @@
   @media print {
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
        Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
-       y el "width: 76mm" de #reciboPrint por "width: 54mm". */
+       y el "width: 76mm" de #reciboModalContent por "width: 54mm". */
     @page { size: 80mm auto; margin: 0; }
-    html, body { margin: 0; padding: 0; }
-    body * { visibility: hidden; }
-    #reciboPrint, #reciboPrint * { visibility: visible; }
-    #reciboPrint {
-      position: absolute;
-      top: 0;
-      left: 0;
+    html, body { margin: 0; padding: 0; height: auto !important; }
+
+    /* Se saca TODO del flujo con display:none (no solo visibility:hidden).
+       Así el documento a imprimir mide lo que mide el recibo, y no hay
+       páginas "fantasma" invisibles que hagan que el navegador repita
+       el recibo en cada una (esa era la causa de los tiquetes duplicados). */
+    body * { display: none !important; }
+    #reciboModal, #reciboModal *,
+    #reciboPrint, #reciboPrint * { display: revert !important; }
+
+    #reciboModal {
+      position: static !important;
+      background: none !important;
+      width: auto !important;
+      height: auto !important;
+    }
+    #reciboModalContent {
+      box-shadow: none !important;
+      max-height: none !important;
+      overflow: visible !important;
       width: 76mm;
-      padding: 2mm 2mm 6mm 2mm;
+      padding: 0mm 2mm 6mm 2mm;
+    }
+    #reciboPrint {
       font-size: 11px;
       line-height: 1.35;
     }
@@ -175,6 +190,8 @@
     #reciboPrint table { table-layout: fixed; width: 100%; }
     #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
     #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
+    .recibo-modal-actions,
+    #reciboModal .recibo-modal-actions { display: none !important; }
   }
 
   /* Modal Buscar Recibos */
@@ -851,10 +868,10 @@
 
   // ✏️ EDITA ESTOS DATOS con la información real de tu negocio (aparecen en el recibo impreso)
   const NEGOCIO = {
-    nombre: "NOMBRE DE TU NEGOCIO",
-    nit: "C.C./NIT: 000.000.000-0",
-    direccion: "Dirección — Ciudad",
-    telefono: "Tel: 000 000 0000"
+    nombre: "Moto Ya!",
+    nit: "C.C./NIT: 1121883884-2",
+    direccion: "Cra 21 #14-89 — Acacias",
+    telefono: "Tel: 314 258 9098"
   };
   
   

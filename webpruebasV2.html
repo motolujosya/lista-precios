@@ -1,0 +1,1967 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Catálogo Tienda</title>
+<style>
+  body { font-family: "Segoe UI", sans-serif; background: linear-gradient(135deg, #f8f9fa, #e0f7fa); margin: 0; padding: 0; }
+  h2 { text-align: center; margin: 20px 0; color: #007bff; }
+  #search { display: block; margin: 10px auto; padding: 8px; width: 80%; border-radius: 6px; border: 1px solid #ccc; }
+
+  .search-bar { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 10px auto; width: 80%; }
+  .search-bar #search { margin: 0; flex: 1; width: auto; }
+  #viewToggleBtn { background: #fff; color: #444; border: 1px solid #ddd; width: 38px; height: 38px; padding: 0; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, background 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  #viewToggleBtn:hover { transform: scale(1.08); background: #f2f2f2; }
+  #viewToggleBtn svg { width: 20px; height: 20px; display: block; }
+
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 20px; }
+  .product-card { background: white; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); padding: 14px; transition: transform 0.2s, box-shadow 0.2s; }
+  .product-card:hover { transform: scale(1.03); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+  .product-card h4 { color: #333; margin: 0 0 6px 0; }
+  .product-card p { margin: 4px 0; }
+  .product-card .card-actions select { width: 100%; margin-bottom: 6px; padding: 4px; border-radius: 6px; border: 1px solid #ccc; }
+  .product-card .card-actions-buttons { display: flex; gap: 6px; }
+  .product-card .card-actions-buttons button { flex: 1; }
+
+  /* Vista de lista */
+  .product-grid.list-view { grid-template-columns: 1fr; gap: 10px; padding: 14px 20px; }
+  .product-grid.list-view .product-card { display: flex; align-items: center; gap: 18px; }
+  .product-grid.list-view .product-card:hover { transform: none; }
+  .product-grid.list-view .card-media { flex-shrink: 0; }
+  .product-grid.list-view .card-media .mini-foto { margin-bottom: 0; }
+  .product-grid.list-view .card-body { flex: 2; min-width: 0; }
+  .product-grid.list-view .card-body p { margin: 2px 0; }
+  .product-grid.list-view .card-actions { flex: 1; min-width: 180px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+  .product-grid.list-view .card-actions-buttons { justify-content: flex-end; }
+
+  @media (max-width: 700px) {
+    .product-grid.list-view .product-card { flex-wrap: wrap; }
+    .product-grid.list-view .card-body, .product-grid.list-view .card-actions { flex: 1 1 100%; }
+  }
+
+  .stock-ok { color: #28a745; font-weight: bold; font-size: 13px; }
+  .stock-low { color: #ff9800; font-weight: bold; font-size: 13px; }
+  .stock-out { color: #dc3545; font-weight: bold; font-size: 13px; }
+
+  .add-btn { background: linear-gradient(90deg, #00b09b, #96c93d); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; transition: transform 0.2s; }
+  .add-btn:hover { transform: scale(1.05); }
+  .add-btn:disabled { background: #ccc; cursor: not-allowed; }
+  .copy-btn { background: linear-gradient(90deg, #007bff, #00c6ff); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+
+  #cartIcon { position: fixed; top: 15px; right: 20px; background: linear-gradient(90deg, #ff7a18, #ffb347); padding: 12px; border-radius: 50%; color: white; cursor: pointer; font-size: 22px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 999; }
+  #cartCount { position: absolute; top: -5px; right: -5px; background: red; color: white; font-size: 12px; padding: 2px 6px; border-radius: 50%; animation: pop 0.3s ease; }
+  @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
+  #pedidoFloatBtn {
+    position: fixed;
+    top: 85px;
+    right: 20px;
+
+    width: 52px;
+    height: 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: linear-gradient(90deg, #007bff, #00c6ff);
+
+    border-radius: 50%;
+
+    color: white;
+    font-size: 24px;
+
+    cursor: pointer;
+
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+
+    z-index: 999;
+
+    transition: transform 0.2s;
+  }
+
+  #pedidoFloatBtn:hover {
+    transform: scale(1.08);
+  }
+
+  .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box; }
+  .cart-panel.open { transform: translateX(0); }
+
+  #cartItems { overflow: visible; }
+  #cartItems::-webkit-scrollbar { width: 6px; }
+  #cartItems::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+
+  .cart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .close-cart { background: linear-gradient(90deg, #ff4d4d, #ff6a00); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .cart-total { font-weight: bold; margin-top: 10px; }
+
+  .cart-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid #eee; }
+  .summary-btn, .clear-btn, .checkout-btn { border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; color: #fff; flex: 1; }
+  .summary-btn { background: linear-gradient(90deg, #007bff, #00c6ff); }
+  .clear-btn { background: linear-gradient(90deg, #ff4d4d, #ff6a00); }
+  .checkout-btn { background: linear-gradient(90deg, #6f42c1, #a855f7); font-weight: bold; }
+  .checkout-btn:hover { transform: scale(1.03); }
+
+  .cart-row { display: flex; justify-content: space-between; align-items: center; background: #fff; margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s, opacity 0.4s ease, margin 0.4s ease; }
+  .cart-row:hover { transform: scale(1.02); }
+  .cart-row.removing { opacity: 0; transform: translateX(-40px); margin: 0; }
+  .remove-item { background: linear-gradient(90deg, #ff4d4d, #ff6a00); color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+
+  .mini-foto { max-width: 150px; max-height: 100px; object-fit: contain; border-radius: 10px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+  .mini-foto.placeholder { display: flex; justify-content: center; align-items: center; background: #f2f2f2; color: #888; font-size: 28px; }
+
+  /* Modal resumen */
+  #summaryModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #summaryContent { background: #fff; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  #summaryTable { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  #summaryTable th, #summaryTable td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+  #summaryButtons { text-align: right; }
+  #summaryButtons button { margin-left: 8px; padding: 6px 10px; border-radius: 6px; color: #fff; border: none; cursor: pointer; }
+  .copy-summary { background: #007bff; }
+  .close-summary { background: #ff4d4d; }
+
+  /* Modal pedidos guardados */
+  #quotesModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #quotesContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 600px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  .close-quotes { background: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; float: right; }
+  .quote-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .quote-row .quote-info { flex: 1; min-width: 0; }
+  .quote-row .quote-info strong { display: block; color: #333; }
+  .quote-row .quote-info span { font-size: 12px; color: #888; }
+  .quote-row .quote-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .load-quote-btn { background: linear-gradient(90deg, #00b09b, #96c93d); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .delete-quote-btn { background: linear-gradient(90deg, #ff4d4d, #ff6a00); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .save-quote-btn { background: linear-gradient(90deg, #6c5ce7, #a29bfe) !important; }
+  .quotes-btn { background: linear-gradient(90deg, #6c5ce7, #a29bfe); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
+  .quotes-btn:hover { transform: scale(1.02); }
+
+  /* Modal recibo */
+  #reciboModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 3000; }
+  #reciboModalContent { background: #fff; border-radius: 10px; padding: 18px; width: 92%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  #reciboPrint { font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #222; }
+  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 16px; }
+  #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #555; line-height: 1.4; }
+  #reciboPrint .recibo-linea { border-top: 1px dashed #999; margin: 8px 0; }
+  #reciboPrint .recibo-dato { font-size: 12px; margin: 2px 0; }
+  #reciboPrint table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #reciboPrint td { padding: 2px 0; vertical-align: top; }
+  #reciboPrint .recibo-total { font-size: 15px; font-weight: bold; text-align: right; margin-top: 6px; }
+  #reciboPrint .recibo-pago { text-align: right; font-size: 12px; color: #333; }
+  #reciboPrint .recibo-disclaimer { text-align: center; font-size: 10px; color: #888; margin-top: 10px; }
+  .recibo-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .recibo-modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .recibo-modal-actions button:first-child { background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; }
+  .recibo-modal-actions button:last-child { background: #eee; color: #333; }
+
+  @media print {
+    /* 🖨️ Ajustado para impresora térmica POS de 80mm.
+       Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
+       y el "width: 76mm" de #reciboPrint por "width: 54mm". */
+    @page { size: 80mm auto; margin: 0; }
+    html, body { margin: 0; padding: 0; }
+    body * { visibility: hidden; }
+    #reciboPrint, #reciboPrint * { visibility: visible; }
+    #reciboPrint {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 76mm;
+      padding: 2mm 2mm 6mm 2mm;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    #reciboPrint h3 { font-size: 13px; }
+    #reciboPrint table { table-layout: fixed; width: 100%; }
+    #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
+    #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
+  }
+
+  /* Modal Buscar Recibos */
+  #buscarRecibosModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #buscarRecibosContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 650px; max-height: 85vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  .recibos-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .recibos-filtros input { flex: 1; min-width: 130px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+  .recibos-filtros button { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .recibo-resultado-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .recibo-resultado-row .rr-info { flex: 1; min-width: 0; }
+  .recibo-resultado-row .rr-info strong { display: block; color: #333; }
+  .recibo-resultado-row .rr-info span { font-size: 12px; color: #888; }
+  .recibo-resultado-row button { background: linear-gradient(90deg, #00b09b, #96c93d); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+
+  /* Modal historial */
+  #historialModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #historialContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 700px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  #historialTable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  #historialTable th { background: #007bff; color: white; padding: 8px; }
+  #historialTable td { border: 1px solid #ddd; padding: 6px; }
+  #historialTable tr:nth-child(even) { background: #f9f9f9; }
+  .close-historial { background: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; float: right; }
+  .historial-btn { background: linear-gradient(90deg, #ff9800, #ffc107); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
+  .historial-btn:hover { transform: scale(1.02); }
+
+
+  /* =========================
+   MODAL FALTANTES
+========================= */
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+
+  justify-content: center;
+  align-items: center;
+
+  z-index: 3000;
+
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+
+  width: 92%;
+  max-width: 420px;
+
+  background: #fff;
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 10px 35px rgba(0,0,0,0.18);
+
+  padding: 18px;
+
+  animation: modalFade 0.25s ease;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Header estilo carrito */
+.modal-header {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 6px;
+}
+
+.modal-header h2 {
+
+  margin: 0;
+
+  font-size: 20px;
+
+  color: #333;
+}
+
+/* Botón cerrar */
+.close-modal {
+
+  background:
+    linear-gradient(90deg,#ff4d4d,#ff6a00);
+
+  color: white;
+
+  border: none;
+
+  border-radius: 8px;
+
+  padding: 6px 10px;
+
+  cursor: pointer;
+
+  font-size: 14px;
+
+  transition: transform 0.2s;
+}
+
+.close-modal:hover {
+  transform: scale(1.05);
+}
+
+/* Inputs */
+.modal-content input,
+.modal-content textarea {
+
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border-radius: 10px;
+
+  border: 1px solid #ddd;
+
+  font-size: 14px;
+
+  box-sizing: border-box;
+
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.modal-content input:focus,
+.modal-content textarea:focus {
+
+  outline: none;
+
+  border-color: #00c6ff;
+
+  box-shadow:
+    0 0 0 3px rgba(0,198,255,0.15);
+}
+
+.modal-content textarea {
+
+  resize: vertical;
+
+  min-height: 90px;
+}
+
+/* Botón guardar */
+.modal-save-btn {
+
+  border: none;
+
+  padding: 12px;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  color: white;
+
+  font-weight: bold;
+
+  font-size: 15px;
+
+  background:
+    linear-gradient(90deg,#007bff,#00c6ff);
+
+  transition:
+    transform 0.2s,
+    opacity 0.2s;
+}
+
+.modal-save-btn:hover {
+  transform: scale(1.02);
+}
+
+/* Sugerencias */
+.suggestions {
+
+  border: 1px solid #eee;
+
+  border-radius: 10px;
+
+  overflow: hidden;
+
+  max-height: 150px;
+
+  overflow-y: auto;
+
+  background: white;
+}
+
+.suggestion-item {
+
+  padding: 10px;
+
+  cursor: pointer;
+
+  transition: background 0.15s;
+}
+
+.suggestion-item:hover {
+  background: #f5f9ff;
+}
+
+
+#lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+  cursor: zoom-out;
+}
+#lightbox.active { display: flex; }
+#lightbox img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  transform: scale(0.85);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  cursor: default;
+}
+#lightbox.active img {
+  transform: scale(1);
+  opacity: 1;
+}
+#lightbox-close {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: none;
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+#lightbox-close:hover { background: rgba(255,255,255,0.3); }
+.mini-foto:not(.placeholder) { cursor: zoom-in; }
+
+@keyframes modalFade {
+
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+  /* Toast */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.4s; z-index: 99999; pointer-events: none; }
+  #toast.show { opacity: 1; }
+
+  /* Botón chat flotante */
+  #chatFloatBtn {
+    position: fixed;
+    top: 155px;
+    right: 20px;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(90deg, #6f42c1, #a855f7);
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    z-index: 999;
+    transition: transform 0.2s;
+  }
+  #chatFloatBtn:hover { transform: scale(1.08); }
+
+  /* Panel lateral chat */
+  #chatPanel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 340px;
+    background: #fff;
+    box-shadow: -3px 0 10px rgba(0,0,0,0.2);
+    padding: 15px;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+  #chatPanel.open { transform: translateX(0); }
+
+  .chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  #chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+    margin-bottom: 12px;
+  }
+  #chatMessages::-webkit-scrollbar { width: 6px; }
+  #chatMessages::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+
+  .chat-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+  }
+  .chat-bubble.user {
+    align-self: flex-end;
+    background: linear-gradient(90deg, #6f42c1, #a855f7);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.bot {
+    align-self: flex-start;
+    background: #f1f1f1;
+    color: #333;
+    border-bottom-left-radius: 4px;
+  }
+  .chat-bubble.typing {
+    align-self: flex-start;
+    background: #f1f1f1;
+    color: #999;
+    font-style: italic;
+  }
+
+  /* Tarjeta de producto dentro del chat */
+  .chat-product-card {
+    align-self: flex-start;
+    max-width: 90%;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .chat-product-card .cp-nombre {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+  .chat-product-card .cp-row {
+    display: flex;
+    justify-content: space-between;
+    color: #555;
+    padding: 2px 0;
+  }
+  .chat-product-card .cp-row span:first-child {
+    color: #888;
+  }
+  .chat-product-card .cp-precio {
+    color: #28a745;
+    font-weight: 600;
+  }
+  .chat-product-card .cp-stock-ok { color: #22a55a; font-weight: 600; }
+  .chat-product-card .cp-stock-no { color: #e0414d; font-weight: 600; }
+  .chat-product-card .cp-info {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #eee;
+    color: #777;
+    font-size: 12px;
+  }
+
+  .chat-product-card .cp-marca {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+.chat-product-card .cp-precio-taller {
+  color: #fd7e14;   /* naranja, diferente al verde del precio público */
+  font-weight: 600;
+}
+.chat-product-card .cp-add-btn {
+  background: linear-gradient(90deg, #00b09b, #96c93d);
+  color: white;
+  border: none;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: transform 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.chat-product-card .cp-add-btn:hover { transform: scale(1.06); }
+.chat-product-card .cp-add-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+.chat-product-card .cp-add-taller {
+  background: linear-gradient(90deg, #fd7e14, #ffc107);
+}
+
+  .chat-input-area {
+    display: flex;
+    gap: 8px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+  }
+  #chatInput {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: none;
+    box-sizing: border-box;
+  }
+  #chatInput:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 3px rgba(168,85,247,0.15);
+  }
+  #chatSendBtn {
+    background: linear-gradient(90deg, #6f42c1, #a855f7);
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: transform 0.2s;
+  }
+  #chatSendBtn:hover { transform: scale(1.05); }
+  #chatSendBtn:disabled { background: #ccc; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<h2>🛍️ Catálogo de productos</h2>
+<div class="search-bar">
+  <input id="search" placeholder="Buscar por nombre o info..." oninput="filterProducts()">
+  <button id="viewToggleBtn" onclick="toggleView()"></button>
+</div>
+<div id="cartIcon">🛒<span id="cartCount">0</span></div>
+<div id="pedidoFloatBtn" onclick="abrirModalPedido()">
+  📝
+</div>
+
+<!-- Botón flotante chat -->
+<div id="chatFloatBtn" onclick="toggleChat()">
+  🤖
+</div>
+
+
+<button class="historial-btn" onclick="verHistorial()">📋 Ver historial de ventas</button>
+<button class="quotes-btn" onclick="abrirPedidosGuardados()">📁 Pedidos guardados</button>
+<button class="quotes-btn" onclick="abrirBuscarRecibos()" style="background: linear-gradient(90deg, #007bff, #00c6ff);">🔎 Buscar recibos</button>
+
+<div class="product-grid" id="productGrid"></div>
+
+
+<!-- Carrito -->
+<div id="cartPanel" class="cart-panel">
+  <div class="cart-header">
+    <h3>🛍️ Tu carrito</h3>
+    <button id="closeCartBtn" class="close-cart">Cerrar</button>
+  </div>
+  <div id="cartItems"></div>
+  <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+  <!-- Datos del cliente para el recibo -->
+  <div id="datosCliente" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+    <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">🧾 Datos del cliente (opcional)</div>
+    <input id="clienteNombre" placeholder="Nombre del cliente" style="width: 100%; margin-bottom: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
+    <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+      <input id="clienteDoc" placeholder="Cédula / NIT" style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; min-width: 0;">
+      <input id="clienteTel" placeholder="Teléfono" style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; min-width: 0;">
+    </div>
+    <select id="formaPago" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
+      <option value="Efectivo">💵 Efectivo</option>
+      <option value="Transferencia">🏦 Transferencia</option>
+      <option value="Tarjeta">💳 Tarjeta</option>
+    </select>
+  </div>
+  <!-- NUEVO: Calculadora de cambio -->
+  <div id="pagoCalculadora" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+      <label for="pagoCliente" style="font-size: 13px; font-weight: bold; color: #555;">Paga con:</label>
+      <input id="pagoCliente" type="number" placeholder="0" style="width: 120px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; text-align: right;">
+    </div>
+    <div id="pagoFormateado" style="text-align: right; font-size: 11px; color: #888; margin-bottom: 8px;">$0</div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 13px; font-weight: bold; color: #555;">Cambio:</span>
+      <span id="cambioCliente" style="font-size: 14px; font-weight: bold; color: #28a745;">$0</span>
+    </div>
+  </div>
+  <div id="sugerenciasPanel" style="display:none; margin-top:12px; padding-top:10px;
+     border-top:1px solid #eee;"></div>
+  <div class="cart-actions">
+    <button id="viewSummaryBtn" class="summary-btn">🧾 Resumen</button>
+    <button id="saveQuoteBtn" class="summary-btn save-quote-btn">💾 Guardar pedido</button>
+    <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar</button>
+    <button id="checkoutBtn" class="checkout-btn">✅ Finalizar compra</button>
+  </div>
+</div>
+
+<!-- Modal Pedidos Guardados -->
+<div id="quotesModal">
+  <div id="quotesContent">
+    <button class="close-quotes" onclick="document.getElementById('quotesModal').style.display='none'">✖ Cerrar</button>
+    <h3>📁 Pedidos guardados</h3>
+    <div id="quotesList" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- Modal Recibo de venta (imprimible) -->
+<div id="reciboModal">
+  <div id="reciboModalContent">
+    <div id="reciboPrint"></div>
+    <div class="recibo-modal-actions">
+      <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+      <button onclick="document.getElementById('reciboModal').style.display='none'">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Buscar Recibos -->
+<div id="buscarRecibosModal">
+  <div id="buscarRecibosContent">
+    <button class="close-quotes" onclick="document.getElementById('buscarRecibosModal').style.display='none'">✖ Cerrar</button>
+    <h3>🔎 Buscar recibos</h3>
+    <div class="recibos-filtros">
+      <input id="filtroFecha" type="date">
+      <input id="filtroNumero" type="text" placeholder="Número de recibo">
+      <input id="filtroCliente" type="text" placeholder="Nombre del cliente">
+      <button onclick="buscarRecibos()">Buscar</button>
+    </div>
+    <div id="resultadosRecibos" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- Modal Resumen -->
+<div id="summaryModal">
+  <div id="summaryContent">
+    <h3>Resumen del pedido</h3>
+    <table id="summaryTable"></table>
+    <div id="summaryButtons">
+      <button class="copy-summary" id="copySummaryBtn">Copiar</button>
+      <button class="close-summary" id="closeSummaryBtn">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Historial -->
+<div id="historialModal">
+  <div id="historialContent">
+    <button class="close-historial" onclick="document.getElementById('historialModal').style.display='none'">✖ Cerrar</button>
+    <h3>📋 Historial de ventas</h3>
+    <div id="totalesPorDia" style="margin:10px 0; font-weight:bold;"></div>
+    <table id="historialTable">
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th></tr></thead>
+      <tbody id="historialBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal faltantes -->
+<div id="pedidoModal" class="modal">
+
+  <div class="modal-content">
+
+    <div class="modal-header">
+
+      <h2>📝 Agregar faltante</h2>
+
+      <button
+        class="close-modal"
+        onclick="cerrarModalPedido()"
+      >
+        ✖
+      </button>
+
+    </div>
+
+    <input
+      id="pedidoMoto"
+      placeholder="Moto"
+    >
+
+    <div
+      id="motoSuggestions"
+      class="suggestions"
+    ></div>
+
+    <input
+      id="pedidoProducto"
+      placeholder="Producto"
+    >
+
+    <div
+      id="productoSuggestions"
+      class="suggestions"
+    ></div>
+
+    <textarea
+      id="pedidoAdicional"
+      placeholder="Nota adicional"
+    ></textarea>
+
+    <button
+      class="modal-save-btn"
+      onclick="guardarPedidoPendiente()"
+    >
+      💾 Guardar faltante
+    </button>
+
+  </div>
+
+</div>
+
+
+<!-- Panel Chat -->
+<div id="chatPanel">
+  <div class="chat-header">
+    <h3>🤖 Asistente</h3>
+    <button class="close-cart" onclick="toggleChat()">Cerrar</button>
+  </div>
+  <div id="chatMessages">
+    <div class="chat-bubble bot">¡Hola! ¿En qué te puedo ayudar?</div>
+  </div>
+  <div class="chat-input-area">
+    <textarea id="chatInput" placeholder="Escribe tu pregunta..." rows="2"></textarea>
+    <button id="chatSendBtn" onclick="enviarMensaje()">➤</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="lightbox">
+  <button id="lightbox-close">✖</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<script>
+  const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
+  const SHEET_NAME = "Lista";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwY5Qyszf78kSb7-93CvxpWr95EE0dMgLP3NhammSjXeNyPDY7phFTNEg8RgAkfhnZcEQ/exec";
+
+  // ✏️ EDITA ESTOS DATOS con la información real de tu negocio (aparecen en el recibo impreso)
+  const NEGOCIO = {
+    nombre: "NOMBRE DE TU NEGOCIO",
+    nit: "C.C./NIT: 000.000.000-0",
+    direccion: "Dirección — Ciudad",
+    telefono: "Tel: 000 000 0000"
+  };
+  
+  
+
+  let cart = [];
+  let productosData = []; // guarda referencia a todos los productos renderizados
+
+  let sugerencias = {
+    motos: [],
+    productos: []
+  };
+
+  // Cargar productos
+  window.google = window.google || {};
+  window.google.visualization = window.google.visualization || {};
+  window.google.visualization.Query = window.google.visualization.Query || {};
+  window.google.visualization.Query.setResponse = function(response) {
+    if (!response || !response.table) return alert("Error cargando datos");
+    const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase());
+    const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
+    renderProducts(cols, rows);
+  };
+  const s = document.createElement('script');
+  s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+  document.head.appendChild(s);
+
+  function githubRaw(url) {
+    if (!url) return "";
+    const ghMatch = url.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/);
+    if (ghMatch) return `https://raw.githubusercontent.com/${ghMatch[1]}/${ghMatch[2]}/${ghMatch[3]}/${ghMatch[4]}`;
+    return url;
+  }
+
+  function renderProducts(cols, rows) {
+    const grid = document.getElementById("productGrid");
+    grid.innerHTML = "";
+    productosData = [];
+
+    rows.sort((a, b) => {
+      const iProd = cols.indexOf("producto");
+      return (a[iProd] || "").toString().toLowerCase().localeCompare((b[iProd] || "").toString().toLowerCase());
+    });
+
+    rows.forEach(r => {
+      const obj = {};
+      cols.forEach((c, i) => obj[c] = r[i]);
+
+      const name = obj["producto"];
+      const price = obj["precio publico"];
+      const priceDesc = obj["precio taller"];
+      const info = obj["info"];
+      const foto = obj["foto"];
+      const link = obj["links"];
+      const code = obj["codigo"];
+      const marca = obj["marca"] || "";
+      const stock = parseInt(obj["inventario"]) || 0;
+      const rel1 = obj["relacionado1"] || "";
+      const rel2 = obj["relacionado2"] || "";
+      const rel3 = obj["relacionado3"] || "";
+      const rel4 = obj["relacionado4"] || "";
+      const relacionados = [rel1, rel2, rel3, rel4].filter(Boolean);
+
+      if (!name) return;
+
+      productosData.push({ name, code, info, stock, price, priceDesc, foto, relacionados });
+
+      const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
+      const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
+      const imgUrl = githubRaw(foto);
+      const imgHtml = foto
+        ? `<img src="${imgUrl}" alt="" class="mini-foto" onclick="abrirLightbox(this.src)">`
+        : `<div class="mini-foto placeholder">📦</div>`;
+
+      const card = document.createElement("div");
+      card.className = "product-card";
+      card.innerHTML = `
+        <div class="card-media">${imgHtml}</div>
+        <div class="card-body">
+          <h4>${name}</h4>
+          <p style="color:#888; font-size:13px; margin: 2px 0 6px 0;"><em>${marca}</em></p>
+          <p><strong>Código:</strong> ${code || "—"}</p>
+          <p>${info || ""}</p>
+          <p class="${stockClass}">${stockLabel}</p>
+        </div>
+        <div class="card-actions">
+          <select>
+            <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
+            <option value="${priceDesc}">Precio Taller: ${formatCurrency(priceDesc)}</option>
+          </select>
+          <div class="card-actions-buttons">
+            <button class="add-btn" ${stock === 0 ? "disabled" : ""}>Agregar</button>
+            <button class="copy-btn">Copiar</button>
+          </div>
+          ${link ? `<p><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
+        </div>
+      `;
+
+      card.querySelector(".add-btn").onclick = () => {
+        const prod = productosData.find(p => p.code === code);
+        const currentStock = prod?.stock || 0;
+        const inCart = cart.filter(p => p.code === code).reduce((s, p) => s + p.qty, 0);
+        if (inCart >= currentStock) {
+          showToast(`⚠️ No hay más stock disponible de "${name}"`);
+          return;
+        }
+        addToCart(name, card.querySelector("select").value, code, info);
+      };
+
+      card.querySelector(".copy-btn").onclick = () => {
+        const val = card.querySelector("select").value;
+        const texto = buildProductLabel(code, name, info);
+        navigator.clipboard.writeText(`${buildProductLabel(code, name, info)} - ${formatCurrency(val)}`);
+        card.querySelector(".copy-btn").textContent = "✅ Copiado";
+        setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
+      };
+
+      grid.appendChild(card);
+    });
+  }
+
+
+  function formatCurrency(num) {
+
+    if (!num) return "$0";
+
+    const valor = Math.round(parseFloat(num));
+
+    return "$" + valor.toLocaleString("es-CO");
+  }
+
+  function abrirModalPedido() {
+    document.getElementById("pedidoModal").style.display = "flex";
+  }
+
+  function cerrarModalPedido() {
+
+    document.getElementById(
+      "pedidoModal"
+    ).style.display = "none";
+  }
+
+  /* cerrar al hacer click afuera */
+  window.addEventListener("click", e => {
+
+    const modal =
+      document.getElementById("pedidoModal");
+
+    if (e.target === modal) {
+
+      cerrarModalPedido();
+    }
+  });
+
+  async function cargarSugerencias() {
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + "?action=sugerencias");
+    const data = await res.json();
+    sugerencias = {
+      motos: Array.isArray(data.motos) ? data.motos : [],
+      productos: Array.isArray(data.productos) ? data.productos : []
+    };
+    setupAutocomplete("pedidoMoto", sugerencias.motos, "motoSuggestions");
+    setupAutocomplete("pedidoProducto", sugerencias.productos, "productoSuggestions");
+  } catch(err) {
+    console.warn("Sugerencias no disponibles:", err);
+  }
+}
+
+    function setupAutocomplete(inputId, list, containerId) {
+      const safeList = Array.isArray(list) ? list : [];  // ← solo agrega esta línea
+      const input =
+        document.getElementById(inputId);
+
+      const container =
+        document.getElementById(containerId);
+
+      input.oninput = () => {
+
+        const value =
+          input.value.toLowerCase().trim();
+
+        container.innerHTML = "";
+
+        if (!value) return;
+
+        const matches = safeList.filter(item =>
+          item.toLowerCase().includes(value)
+        );
+
+        matches.slice(0, 5).forEach(match => {
+
+          const div =
+            document.createElement("div");
+
+          div.className = "suggestion-item";
+
+          div.innerText = match;
+
+          div.onclick = () => {
+
+            input.value = match;
+
+            container.innerHTML = "";
+          };
+
+          container.appendChild(div);
+        });
+      };
+      }
+
+      async function guardarPedidoPendiente() {
+        const moto = document.getElementById("pedidoMoto").value.trim();
+        const producto = document.getElementById("pedidoProducto").value.trim();
+        const nota = document.getElementById("pedidoAdicional").value.trim();
+
+        if (!moto || !producto) {
+          return showToast("⚠️ Completa moto y producto");
+        }
+
+        const data = {
+          action: "guardarPedidoPendiente",
+          proveedor: "",
+          moto,
+          producto,
+          nota
+        };
+
+        try {
+          const res = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(data)
+          });
+
+          const result = await res.json();
+          if (!res.ok || result.error) {
+            throw new Error(result.error || "Error del servidor");
+          }
+
+          showToast("✅ Guardado correctamente");
+          document.getElementById("pedidoModal").style.display = "none";
+          document.getElementById("pedidoMoto").value = "";
+          document.getElementById("pedidoProducto").value = "";
+          document.getElementById("pedidoAdicional").value = "";
+          await cargarSugerencias();
+
+        } catch (err) {
+          console.error(err);
+          alert("❌ Error al guardar: " + err.message);
+        }
+}
+
+  function filterProducts() {
+    const q = document.getElementById("search").value.toLowerCase();
+    document.querySelectorAll(".product-card").forEach(c => {
+      c.style.display = c.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  }
+
+  // 🔀 Vista de catálogo (cuadrícula / lista)
+  let currentView = localStorage.getItem("catalogView") || "grid";
+
+  const ICON_LIST = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="4" cy="6" r="1.6" fill="#444"/>
+      <rect x="8.5" y="4.6" width="12" height="2.8" rx="1.4" fill="#444"/>
+      <circle cx="4" cy="12" r="1.6" fill="#444"/>
+      <rect x="8.5" y="10.6" width="12" height="2.8" rx="1.4" fill="#444"/>
+      <circle cx="4" cy="18" r="1.6" fill="#444"/>
+      <rect x="8.5" y="16.6" width="12" height="2.8" rx="1.4" fill="#444"/>
+    </svg>`;
+
+  const ICON_GRID = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+      <rect x="13" y="3.5" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+      <rect x="3.5" y="13" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+      <rect x="13" y="13" width="7.5" height="7.5" rx="1.8" fill="#444"/>
+    </svg>`;
+
+  function aplicarVista() {
+    const grid = document.getElementById("productGrid");
+    const btn = document.getElementById("viewToggleBtn");
+    if (!grid) return;
+    grid.classList.toggle("list-view", currentView === "list");
+    if (btn) {
+      // El ícono mostrado representa la vista a la que se cambiará al hacer clic
+      btn.innerHTML = currentView === "grid" ? ICON_LIST : ICON_GRID;
+      btn.title = currentView === "grid" ? "Cambiar a vista de lista" : "Cambiar a vista de cuadrícula";
+    }
+  }
+
+  function toggleView() {
+    currentView = currentView === "grid" ? "list" : "grid";
+    localStorage.setItem("catalogView", currentView);
+    aplicarVista();
+    // La búsqueda no se toca: filterProducts sigue operando sobre .product-card
+  }
+
+  aplicarVista();
+
+  // Carrito
+  const cartIcon = document.getElementById("cartIcon");
+  const cartCount = document.getElementById("cartCount");
+  const cartPanel = document.getElementById("cartPanel");
+  const cartItemsDiv = document.getElementById("cartItems");
+
+  cartIcon.onclick = () => cartPanel.classList.toggle("open");
+  document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
+
+  
+
+
+  function addToCart(name, price, code = "", info = "") {
+    const label = buildProductLabel(code, name, info);
+    const existing = cart.find(p => p.code === code && p.price == price);
+    if (existing) existing.qty++;
+    else cart.push({ code, name, info, label, price: parseFloat(price), qty: 1 });
+    updateCartDisplay();
+    animateCartCount();
+    mostrarSugerencias(code);
+}
+
+
+function buildProductLabel(code, name, info) {
+  return [code, name, info].filter(Boolean).join(" ");
+}
+
+function mostrarSugerencias(code) {
+  const producto = productosData.find(p => p.code === code);
+  const panel = document.getElementById("sugerenciasPanel");
+
+  if (!producto || producto.relacionados.length === 0) {
+    panel.style.display = "none";
+    return;
+  }
+
+  const relacionados = producto.relacionados
+    .map(r => productosData.find(p => p.name === r))
+    .filter(p => p && p.stock > 0 && !cart.find(c => c.code === p.code));
+
+  if (relacionados.length === 0) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
+      💡 También te recomendamos:
+    </p>
+    ${relacionados.map(p => {
+      const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
+      const fotoUrl = p.foto ? githubRaw(p.foto) : "";
+      return `
+        <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
+                    border-radius:8px; padding:8px; margin-bottom:6px;">
+          ${fotoUrl
+            ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;
+                border-radius:6px; flex-shrink:0;">`
+            : `<div style="width:48px; height:48px; background:#eee; border-radius:6px;
+                display:flex; align-items:center; justify-content:center; font-size:20px;">📦</div>`
+          }
+          <div style="flex:1; min-width:0;">
+            <p style="margin:0; font-size:12px; font-weight:bold; color:#333;
+                      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${p.name}
+            </p>
+            <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
+              ${formatCurrency(precioMostrar)}
+            </p>
+          </div>
+          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '${(p.info || "").replace(/'/g,"\\'")}')"
+                  style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
+                        border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
+                        font-size:12px; flex-shrink:0;">
+            + Agregar
+          </button>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
+  function updateCartDisplay() {
+    cartItemsDiv.innerHTML = "";
+    let total = 0;
+    cart.forEach((item, i) => {
+      const row = document.createElement("div");
+      row.className = "cart-row";
+      total += item.qty * item.price;
+      row.innerHTML = `
+        <span>${item.label} x${item.qty}</span>
+        <span>${formatCurrency(item.price * item.qty)}</span>
+        <button class="remove-item">🗑️</button>
+      `;
+
+      row.querySelector(".remove-item").addEventListener("click", () => {
+        row.classList.add("removing");
+        setTimeout(() => {
+          cart.splice(i, 1);
+          updateCartDisplay();
+          if (cart.length === 0) {
+            document.getElementById("sugerenciasPanel").style.display = "none";
+          }
+        }, 400);
+      });
+
+      cartItemsDiv.appendChild(row);
+    });
+    document.getElementById("cartTotal").textContent = formatCurrency(total);
+    updateCartCount();
+
+    // NUEVO: Calcular cambio dinámicamente
+    const inputPago = document.getElementById("pagoCliente");
+    const txtFormateado = document.getElementById("pagoFormateado");
+    const txtCambio = document.getElementById("cambioCliente");
+    
+    function calcularCambio() {
+      const pago = parseFloat(inputPago.value) || 0;
+      // Actualiza la ayuda visual de los miles abajo del input
+      txtFormateado.textContent = formatCurrency(pago);
+      if (pago > 0 && pago >= total) {
+        txtCambio.textContent = formatCurrency(pago - total);
+        txtCambio.style.color = "#28a745"; // Verde si cubre el total
+      } else {
+        txtCambio.textContent = "$0";
+        txtCambio.style.color = "#dc3545"; // Rojo si falta dinero o es 0
+      }
+    }
+    
+    inputPago.oninput = calcularCambio;
+    calcularCambio(); // Ejecutar al actualizar el carrito
+  }
+
+  function updateCartCount() {
+    cartCount.textContent = cart.reduce((sum, i) => sum + i.qty, 0);
+  }
+
+  function animateCartCount() {
+    cartCount.style.animation = "none";
+    cartCount.offsetHeight;
+    cartCount.style.animation = "pop 0.3s ease";
+  }
+
+  // 🔎 Buscar recibos guardados en la hoja "Recibos"
+  function abrirBuscarRecibos() {
+    document.getElementById("buscarRecibosModal").style.display = "flex";
+    document.getElementById("resultadosRecibos").innerHTML = `<p style="text-align:center; color:#888;">Usa los filtros y presiona "Buscar".</p>`;
+  }
+
+  async function buscarRecibos() {
+    const cont = document.getElementById("resultadosRecibos");
+    cont.innerHTML = `<p style="text-align:center; color:#888;">Buscando...</p>`;
+
+    const fechaFiltro = document.getElementById("filtroFecha").value; // yyyy-mm-dd
+    const numeroFiltro = document.getElementById("filtroNumero").value.trim().toLowerCase();
+    const clienteFiltro = document.getElementById("filtroCliente").value.trim().toLowerCase();
+
+    try {
+      const RECIBOS_NAME = "Recibos";
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(RECIBOS_NAME)}&tqx=out:json&_=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+
+      let rows = json.table.rows.map(r => r.c.map(c => c ? (c.f || c.v) : ""));
+
+      // Columnas: Numero(0) Fecha(1) Cliente(2) Cedula(3) Telefono(4) FormaPago(5) Productos(6) Total(7) PagoCon(8) Cambio(9) ProductosJSON(10)
+      rows = rows.filter(r => {
+        const numero = (r[0] || "").toString().toLowerCase();
+        const fecha = (r[1] || "").toString(); // "yyyy-MM-dd HH:mm:ss"
+        const cliente = (r[2] || "").toString().toLowerCase();
+
+        if (numeroFiltro && !numero.includes(numeroFiltro)) return false;
+        if (clienteFiltro && !cliente.includes(clienteFiltro)) return false;
+        if (fechaFiltro && !fecha.startsWith(fechaFiltro)) return false;
+        return true;
+      });
+
+      if (rows.length === 0) {
+        cont.innerHTML = `<p style="text-align:center; color:#888;">No se encontraron recibos con esos filtros.</p>`;
+        return;
+      }
+
+      cont.innerHTML = [...rows].reverse().map(r => `
+        <div class="recibo-resultado-row">
+          <div class="rr-info">
+            <strong>Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""}</strong>
+            <span>${r[1]} · ${formatCurrency(parseFloat(r[7]) || 0)} · ${r[5] || "—"}</span>
+          </div>
+          <button onclick='reimprimirRecibo(${JSON.stringify(r).replace(/'/g, "&apos;")})'>👁️ Ver</button>
+        </div>
+      `).join("");
+
+    } catch (e) {
+      console.error(e);
+      cont.innerHTML = `<p style="text-align:center; color:#dc3545;">No se pudo consultar la hoja "Recibos". ¿Ya existe esa pestaña en tu Google Sheet? Se crea sola tras la primera venta con el Apps Script actualizado.</p>`;
+    }
+  }
+
+  function reimprimirRecibo(r) {
+    let items = [];
+    try { items = JSON.parse(r[10] || "[]"); } catch (e) { items = []; }
+
+    mostrarRecibo({
+      numero: r[0],
+      fecha: r[1],
+      clienteNombre: r[2],
+      clienteDoc: r[3],
+      clienteTel: r[4],
+      formaPago: r[5],
+      total: parseFloat(r[7]) || 0,
+      pagoCon: parseFloat(r[8]) || 0,
+      cambio: parseFloat(r[9]) || 0,
+      items
+    });
+  }
+
+  // 💾 Pedidos guardados (cotizaciones) — se guardan en este navegador
+  const QUOTES_KEY = "pedidosGuardados";
+
+  function getSavedQuotes() {
+    try {
+      return JSON.parse(localStorage.getItem(QUOTES_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function setSavedQuotes(quotes) {
+    localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
+  }
+
+  document.getElementById("saveQuoteBtn").onclick = () => {
+    if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+    const nombre = prompt("Nombre o referencia para este pedido (ej: cliente, moto, etc.):", "");
+    if (nombre === null) return; // canceló
+
+    const quotes = getSavedQuotes();
+    const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+    quotes.push({
+      id: Date.now(),
+      nombre: nombre.trim() || "Sin nombre",
+      fecha: new Date().toLocaleString(),
+      total,
+      items: JSON.parse(JSON.stringify(cart))
+    });
+    setSavedQuotes(quotes);
+    showToast("💾 Pedido guardado. Puedes recuperarlo en 'Pedidos guardados'.");
+  };
+
+  function abrirPedidosGuardados() {
+    renderQuotesList();
+    document.getElementById("quotesModal").style.display = "flex";
+  }
+
+  function renderQuotesList() {
+    const quotes = getSavedQuotes();
+    const list = document.getElementById("quotesList");
+
+    if (quotes.length === 0) {
+      list.innerHTML = `<p style="text-align:center; color:#888;">No tienes pedidos guardados.</p>`;
+      return;
+    }
+
+    list.innerHTML = [...quotes].reverse().map(q => {
+      const cantidadItems = q.items.reduce((s, i) => s + i.qty, 0);
+      return `
+        <div class="quote-row">
+          <div class="quote-info">
+            <strong>${q.nombre}</strong>
+            <span>${q.fecha} · ${cantidadItems} producto(s) · ${formatCurrency(q.total)}</span>
+          </div>
+          <div class="quote-actions">
+            <button class="load-quote-btn" onclick="cargarPedidoGuardado(${q.id})">📥 Cargar</button>
+            <button class="delete-quote-btn" onclick="eliminarPedidoGuardado(${q.id})">🗑️</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function cargarPedidoGuardado(id) {
+    const quotes = getSavedQuotes();
+    const quote = quotes.find(q => q.id === id);
+    if (!quote) return;
+
+    if (cart.length > 0) {
+      if (!confirm("Esto reemplazará el carrito actual por el pedido guardado. ¿Continuar?")) return;
+    }
+
+    cart = JSON.parse(JSON.stringify(quote.items));
+    updateCartDisplay();
+    document.getElementById("quotesModal").style.display = "none";
+    cartPanel.classList.add("open");
+    showToast(`📥 Pedido "${quote.nombre}" cargado en el carrito.`);
+  }
+
+  function eliminarPedidoGuardado(id) {
+    if (!confirm("¿Eliminar este pedido guardado?")) return;
+    const quotes = getSavedQuotes().filter(q => q.id !== id);
+    setSavedQuotes(quotes);
+    renderQuotesList();
+  }
+
+  document.getElementById("clearCartBtn").onclick = () => {
+    if (cart.length === 0) return showToast("El carrito ya está vacío.");
+    if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
+      cart = [];
+      updateCartDisplay();
+
+      // Limpia el input y fuerza a que se recalculen el texto gris y el cambio
+      const inputPago = document.getElementById("pagoCliente");
+      inputPago.value = "";
+      if (typeof inputPago.oninput === "function") inputPago.oninput();
+
+      showToast("🗑️ Carrito vaciado.");
+      document.getElementById("sugerenciasPanel").style.display = "none";
+    }
+  };
+
+  // 🧾 Recibo de venta (documento interno, no factura electrónica DIAN)
+  // 🔢 Consulta el número de recibo REAL que acaba de asignar el servidor
+  // (ya no se adivina antes de vender: el backend lo asigna de forma atómica
+  // con LockService, así que aquí solo leemos el último registrado).
+  async function obtenerUltimoNumeroRecibo() {
+    try {
+      const RECIBOS_NAME = "Recibos";
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(RECIBOS_NAME)}&tqx=out:json&_=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+      const rows = json.table.rows;
+      if (rows.length === 0) return "—";
+      const ultima = rows[rows.length - 1].c;
+      return ultima[0] ? (ultima[0].f || ultima[0].v) : "—";
+    } catch (e) {
+      return "—";
+    }
+  }
+
+  function mostrarRecibo(r) {
+    const filasHtml = r.items.map(i => `
+      <tr>
+        <td>${i.qty}x ${i.label || i.name}</td>
+        <td style="text-align:right; white-space:nowrap;">${formatCurrency(i.qty * i.price)}</td>
+      </tr>
+    `).join("");
+
+    document.getElementById("reciboPrint").innerHTML = `
+      <h3>${NEGOCIO.nombre}</h3>
+      <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
+      <div class="recibo-linea"></div>
+      <div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>
+      <div class="recibo-dato"><strong>Fecha:</strong> ${r.fecha}</div>
+      ${r.clienteNombre ? `<div class="recibo-dato"><strong>Cliente:</strong> ${r.clienteNombre}</div>` : ""}
+      ${r.clienteDoc ? `<div class="recibo-dato"><strong>Cédula/NIT:</strong> ${r.clienteDoc}</div>` : ""}
+      ${r.clienteTel ? `<div class="recibo-dato"><strong>Tel:</strong> ${r.clienteTel}</div>` : ""}
+      <div class="recibo-linea"></div>
+      <table>${filasHtml}</table>
+      <div class="recibo-linea"></div>
+      <div class="recibo-total">TOTAL: ${formatCurrency(r.total)}</div>
+      <div class="recibo-pago">Forma de pago: ${r.formaPago}</div>
+      ${r.pagoCon ? `<div class="recibo-pago">Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}</div>` : ""}
+      <div class="recibo-linea"></div>
+      <div class="recibo-disclaimer">Documento interno de venta. No constituye factura electrónica ante la DIAN.</div>
+    `;
+
+    document.getElementById("reciboModal").style.display = "flex";
+  }
+
+  // ✅ Finalizar compra
+  document.getElementById("checkoutBtn").onclick = async () => {
+  if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+  if (!confirm(`¿Confirmar compra de ${cart.reduce((s,i)=>s+i.qty,0)} productos?`)) return;
+
+  const btn = document.getElementById("checkoutBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Procesando...";
+
+  // Datos capturados para el recibo y para el registro en la hoja "Recibos"
+  const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+  const clienteNombre = document.getElementById("clienteNombre").value.trim();
+  const clienteDoc = document.getElementById("clienteDoc").value.trim();
+  const clienteTel = document.getElementById("clienteTel").value.trim();
+  const formaPago = document.getElementById("formaPago").value;
+  const pagoCon = parseFloat(document.getElementById("pagoCliente").value) || 0;
+  const cambio = pagoCon > total ? pagoCon - total : 0;
+
+  console.log("📦 Preparando venta...");
+
+  try {
+    const data = {
+      total,
+      formaPago,
+      pagoCon,
+      cambio,
+      cliente: {
+        nombre: clienteNombre,
+        cedula: clienteDoc,
+        telefono: clienteTel
+      },
+      items: cart.map(i => ({
+        code: i.code,
+        name: i.name,
+        label: i.label,
+        qty: parseInt(i.qty),
+        price: Math.round(parseFloat(i.price))
+      }))
+    };
+
+    console.log("📦 Enviando al servidor:", JSON.stringify(data));
+
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    console.log("✅ Respuesta recibida:", response);
+    console.log("Tipo:", response.type); // con no-cors siempre será "opaque"
+
+    showToast("✅ ¡Compra finalizada! Inventario actualizado.");
+
+    // Pequeña espera para que la hoja de Google ya refleje el recibo
+    // recién escrito por el servidor antes de consultarlo (mismo patrón
+    // que ya se usaba para recargar el catálogo tras vender).
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const numeroRecibo = await obtenerUltimoNumeroRecibo();
+
+    mostrarRecibo({
+      numero: numeroRecibo,
+      fecha: new Date().toLocaleString(),
+      items: JSON.parse(JSON.stringify(cart)),
+      total,
+      clienteNombre, clienteDoc, clienteTel,
+      formaPago, pagoCon, cambio
+    });
+
+    cart = [];
+    updateCartDisplay();
+
+    // Limpia los campos y actualiza los textos visuales tras la compra
+    document.getElementById("clienteNombre").value = "";
+    document.getElementById("clienteDoc").value = "";
+    document.getElementById("clienteTel").value = "";
+    document.getElementById("formaPago").value = "Efectivo";
+    const inputPago = document.getElementById("pagoCliente");
+    inputPago.value = "";
+    if (typeof inputPago.oninput === "function") inputPago.oninput();
+    
+    cartPanel.classList.remove("open");
+    // Recarga solo el catálogo sin destruir el WebSocket
+    setTimeout(() => {
+      const s = document.createElement('script');
+      s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&_=${Date.now()}`;
+      document.head.appendChild(s);
+    }, 2000);
+
+  } catch (err) {
+    console.error("❌ Error completo:", err);
+    alert("❌ Error: " + err.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "✅ Finalizar compra";
+};
+
+function parseFechaSheet(val) {
+  if (!val) return "—";
+  return val.toString();
+}
+
+
+  // 📋 Ver historial
+  async function verHistorial() {
+    const VENTAS_NAME = "Ventas";
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(VENTAS_NAME)}&tqx=out:json`;
+
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(
+        text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
+      );
+
+      const rows = json.table.rows.map(r =>
+        r.c.map(c => c ? (c.f || c.v) : "")
+      );
+
+      const tbody = document.getElementById("historialBody");
+      tbody.innerHTML = "";
+
+      const resumenDias = {};
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align:center">
+              Sin ventas registradas aún.
+            </td>
+          </tr>`;
+      } else {
+
+        [...rows].reverse().forEach(r => {
+
+          const fechaVisible = parseFechaSheet(r[0]);
+
+          // obtener solo la fecha
+          const fechaDia = fechaVisible.split(" ")[0];
+
+          const subtotal = Number(r[4]) || 0;
+
+          // acumular total diario
+          if (!resumenDias[fechaDia]) {
+            resumenDias[fechaDia] = 0;
+          }
+
+          resumenDias[fechaDia] += subtotal;
+
+          tbody.innerHTML += `
+            <tr>
+              <td>${fechaVisible}</td>
+              <td>${r[1] || "—"}</td>
+              <td>${r[2] || 0}</td>
+              <td>${formatCurrency(r[3])}</td>
+              <td>${formatCurrency(subtotal)}</td>
+            </tr>`;
+          });
+      }
+
+      // Mostrar resumen por día
+      let resumenHTML = "💰 Totales por día:<br><br>";
+
+      Object.keys(resumenDias)
+        .sort()
+        .reverse()
+        .forEach(fecha => {
+          resumenHTML += `
+            ${fecha}: ${formatCurrency(resumenDias[fecha])}<br>
+          `;
+        });
+
+      document.getElementById("totalesPorDia").innerHTML = resumenHTML;
+
+      document.getElementById("historialModal").style.display = "flex";
+
+    } catch (e) {
+      alert("❌ No se pudo cargar el historial.");
+      console.error(e);
+    }
+  }
+
+  // Resumen modal
+  document.getElementById("viewSummaryBtn").onclick = () => {
+    const table = document.getElementById("summaryTable");
+    table.innerHTML = "<tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr>";
+    let total = 0;
+    cart.forEach(i => {
+      total += i.qty * i.price;
+      table.innerHTML += `<tr><td>${i.label}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
+    });
+    table.innerHTML += `<tr><th colspan=2>Total</th><th>${formatCurrency(total)}</th></tr>`;
+    document.getElementById("summaryModal").style.display = "flex";
+  };
+
+  document.getElementById("closeSummaryBtn").onclick = () => document.getElementById("summaryModal").style.display = "none";
+
+  document.getElementById("copySummaryBtn").onclick = () => {
+    let text = "🧾 Resumen del pedido:\n";
+    cart.forEach(i => text += `- ${i.label} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
+    text += `TOTAL: ${formatCurrency(cart.reduce((s,i) => s + i.qty * i.price, 0))}`;
+    navigator.clipboard.writeText(text);
+    showToast("✅ Resumen copiado al portapapeles");
+  };
+
+  // Toast
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+  window.addEventListener("DOMContentLoaded", async () => {
+
+    await cargarSugerencias();
+
+    });
+
+    // Lightbox
+    // Lightbox
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+
+window.abrirLightbox = function(src) {
+  lightboxImg.src = src;
+  lightboxImg.alt = "";
+  lightbox.classList.add("active");
+  document.body.style.overflow = "hidden";
+};
+
+function cerrarLightbox() {
+  lightbox.classList.remove("active");
+  document.body.style.overflow = "";
+}
+
+document.getElementById("lightbox-close").onclick = e => {
+  e.stopPropagation();
+  cerrarLightbox();
+};
+
+lightbox.onclick = cerrarLightbox;
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") cerrarLightbox();
+});
+
+// =====================
+// CHAT WEBSOCKET
+// =====================
+const chatPanel = document.getElementById("chatPanel");
+const chatMessages = document.getElementById("chatMessages");
+const chatInput = document.getElementById("chatInput");
+const chatSendBtn = document.getElementById("chatSendBtn");
+
+// Identificador único para esta sesión de chat
+const clientId = crypto.randomUUID();
+
+// Burbuja "escribiendo..." que se actualiza/elimina dinámicamente
+let typingBubble = null;
+let ws = null;
+let wsReconectando = false;
+let pingInterval = null;
+
+function conectarWS() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+  ws = new WebSocket(`wss://smoked-portly-slot.ngrok-free.dev/ws/${clientId}`);
+
+  ws.onopen = () => {
+    console.log("✅ Conectado al chat:", clientId);
+    wsReconectando = false;
+    clearInterval(pingInterval);
+    // Ping cada 25s para evitar que el servidor/proxy cierre la conexión por inactividad
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send("__ping__");
+    }, 25000);
+  };
+
+  ws.onclose = () => {
+    console.warn("⚠️ WebSocket cerrado. Reconectando en 3s...");
+    clearInterval(pingInterval);
+    if (!wsReconectando) {
+      wsReconectando = true;
+      setTimeout(conectarWS, 3000);
+    }
+  };
+
+  ws.onerror = (err) => {
+    console.error("Error en WebSocket:", err);
+    ws.close();
+  };
+
+  // Cuando llega un mensaje desde el backend (vía Redis Pub/Sub)
+  ws.onmessage = (event) => {
+    if (event.data === "__pong__") return; // ignorar respuesta de ping
+    const datos = JSON.parse(event.data);
+
+    if (datos.status === "typing") {
+      // Muestra/actualiza la burbuja de "escribiendo..."
+      if (!typingBubble) {
+        typingBubble = agregarBurbuja(datos.message, "typing");
+      } else {
+        typingBubble.textContent = datos.message;
+      }
+    } else if (datos.status === "completed") {
+      // Quita la burbuja de "escribiendo..."
+      if (typingBubble) {
+        typingBubble.remove();
+        typingBubble = null;
+      }
+
+      // Si vienen productos estructurados, se muestran como tarjetas
+      if (Array.isArray(datos.productos) && datos.productos.length > 0) {
+        if (datos.response_text) {
+          agregarBurbuja(datos.response_text, "bot");
+        }
+        datos.productos.forEach(p => agregarTarjetaProducto(p));
+      } else if (datos.response) {
+        // Compatibilidad con respuestas de solo texto
+        agregarBurbuja(datos.response, "bot");
+      } else if (datos.response_text) {
+        agregarBurbuja(datos.response_text, "bot");
+      }
+
+      chatSendBtn.disabled = false;
+    }
+  };
+}
+
+// Iniciar conexión al cargar la página
+conectarWS();
+
+function toggleChat() {
+  chatPanel.classList.toggle("open");
+}
+
+function agregarBurbuja(texto, tipo) {
+  const burbuja = document.createElement("div");
+  burbuja.className = `chat-bubble ${tipo}`;
+  burbuja.textContent = texto;
+  chatMessages.appendChild(burbuja);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return burbuja;
+}
+
+
+function agregarTarjetaProducto(p) {
+  const tarjeta = document.createElement("div");
+  tarjeta.className = "chat-product-card";
+
+  const stock = Number(p.stock) || 0;
+  const stockClase = stock > 0 ? "cp-stock-ok" : "cp-stock-no";
+  const stockTexto = stock > 0 ? `${stock} disponibles` : "Sin stock";
+
+  const precioNum = Number(p.precio || 0);
+  const precioTallerNum = Number(p.precio_taller || 0);
+  const precioFormateado = precioNum.toLocaleString("es-CO");
+  const precioTallerFormateado = precioTallerNum.toLocaleString("es-CO");
+
+  tarjeta.innerHTML = `
+  <div class="cp-nombre">${p.nombre ?? "Producto"}</div>
+  <div class="cp-marca">${p.marca ?? ""}</div>
+  <div class="cp-row"><span>Código</span><span>${p.codigo ?? "-"}</span></div>
+  <div class="cp-row">
+    <span>Precio</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span class="cp-precio">$${precioFormateado}</span>
+      <button class="cp-add-btn" data-precio="${precioNum}" ${stock === 0 ? "disabled" : ""}>+ Agregar</button>
+    </span>
+  </div>
+  ${p.precio_taller ? `
+  <div class="cp-row">
+    <span>Precio taller</span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span class="cp-precio-taller">$${precioTallerFormateado}</span>
+      <button class="cp-add-btn cp-add-taller" data-precio="${precioTallerNum}" ${stock === 0 ? "disabled" : ""}>+ Agregar</button>
+    </span>
+  </div>` : ""}
+  <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
+  ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
+`;
+
+  // Eventos de los botones agregar
+  tarjeta.querySelectorAll(".cp-add-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const precio = parseFloat(btn.dataset.precio);
+      addToCart(
+        p.nombre ?? "Producto",
+        precio,
+        p.codigo ?? "",
+        p.info ?? ""
+      );
+      // Feedback visual breve
+      const original = btn.textContent;
+      btn.textContent = "✅";
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.disabled = stock === 0;
+      }, 1000);
+    });
+  });
+
+  chatMessages.appendChild(tarjeta);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return tarjeta;
+}
+
+function enviarMensaje() {
+  const texto = chatInput.value.trim();
+  if (!texto) return;
+
+  // Muestra mensaje del usuario
+  agregarBurbuja(texto, "user");
+  chatInput.value = "";
+  chatSendBtn.disabled = true;
+
+  // Envía el mensaje al backend por WebSocket
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast("⏳ Reconectando chat... intenta en un momento.");
+    conectarWS();
+    return;
+  }
+  ws.send(texto);
+}
+
+// Enviar con Enter (Shift+Enter para nueva línea)
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    enviarMensaje();
+  }
+});
+
+</script>
+</body>
+</html>

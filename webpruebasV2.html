@@ -182,14 +182,24 @@
       width: 76mm;
       padding: 0mm 2mm 6mm 2mm;
     }
-    #reciboPrint {
-      font-size: 11px;
-      line-height: 1.35;
+    /* 🖤 Forzamos negro puro (nada de grises) y más peso de fuente.
+       En térmica los grises se "ditherean" (se simulan con puntos) y eso
+       es lo que se ve borroso/difuminado; el negro sólido imprime nítido. */
+    #reciboPrint, #reciboPrint * {
+      color: #000 !important;
+      font-weight: 600 !important;
+      -webkit-font-smoothing: none !important;
     }
-    #reciboPrint h3 { font-size: 13px; }
+    #reciboPrint {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    #reciboPrint h3 { font-size: 15px; font-weight: 700 !important; }
+    #reciboPrint .recibo-linea { border-top: 1.5px dashed #000 !important; }
     #reciboPrint table { table-layout: fixed; width: 100%; }
     #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
     #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
+    #reciboPrint .recibo-total { font-size: 15px; }
     .recibo-modal-actions,
     #reciboModal .recibo-modal-actions { display: none !important; }
   }
@@ -869,7 +879,7 @@
   // ✏️ EDITA ESTOS DATOS con la información real de tu negocio (aparecen en el recibo impreso)
   const NEGOCIO = {
     nombre: "Moto Ya!",
-    nit: "C.C./NIT: 1121883884-2",
+    nit: "C.C./NIT: 1.121.883.884-2",
     direccion: "Cra 21 #14-89 — Acacias",
     telefono: "Tel: 314 258 9098"
   };

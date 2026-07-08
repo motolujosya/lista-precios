@@ -234,6 +234,11 @@
   #historialTable td { border: 1px solid #ddd; padding: 6px; }
   #historialTable tr:nth-child(even) { background: #f9f9f9; }
   .close-historial { background: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; float: right; }
+  .historial-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 10px 0; clear: both; }
+  .historial-filtros label { display: flex; flex-direction: column; font-size: 12px; color: #555; gap: 3px; }
+  .historial-filtros input[type="date"] { padding: 6px; border-radius: 6px; border: 1px solid #ccc; }
+  .historial-filtros button { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; height: 33px; }
+  .historial-filtros .btn-ver-todo { background: #eee; color: #333; }
   .historial-btn { background: linear-gradient(90deg, #ff9800, #ffc107); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
   .historial-btn:hover { transform: scale(1.02); }
 
@@ -804,6 +809,12 @@
   <div id="historialContent">
     <button class="close-historial" onclick="document.getElementById('historialModal').style.display='none'">✖ Cerrar</button>
     <h3>📋 Historial de ventas</h3>
+    <div class="historial-filtros">
+      <label>Desde <input type="date" id="historialDesde"></label>
+      <label>Hasta <input type="date" id="historialHasta"></label>
+      <button onclick="aplicarFiltroHistorial()">Filtrar</button>
+      <button class="btn-ver-todo" onclick="limpiarFiltroHistorial()">Ver todo</button>
+    </div>
     <div id="totalesPorDia" style="margin:10px 0; font-weight:bold;"></div>
     <table id="historialTable">
       <thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th></tr></thead>
@@ -1816,10 +1827,20 @@ function parseFechaSheet(val) {
 }
 
 
-  // 📋 Ver historial
+  let historialRowsCache = null;
+
+  function formatFechaISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  // 📋 Ver historial (carga los datos UNA vez y los deja en caché;
+  // el filtrado por fecha se hace después en el navegador, sin re-consultar el Sheet)
   async function verHistorial() {
     const VENTAS_NAME = "Ventas";
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(VENTAS_NAME)}&tqx=out:json`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(VENTAS_NAME)}&tqx=out:json&_=${Date.now()}`;
 
     try {
       const res = await fetch(url);
@@ -1828,71 +1849,104 @@ function parseFechaSheet(val) {
         text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
       );
 
-      const rows = json.table.rows.map(r =>
+      historialRowsCache = json.table.rows.map(r =>
         r.c.map(c => c ? (c.f || c.v) : "")
       );
 
-      const tbody = document.getElementById("historialBody");
-      tbody.innerHTML = "";
+      // Por defecto: últimos 15 días (incluyendo hoy)
+      const hoy = new Date();
+      const hace15 = new Date();
+      hace15.setDate(hoy.getDate() - 14);
 
-      const resumenDias = {};
+      document.getElementById("historialHasta").value = formatFechaISO(hoy);
+      document.getElementById("historialDesde").value = formatFechaISO(hace15);
 
-      if (rows.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="5" style="text-align:center">
-              Sin ventas registradas aún.
-            </td>
-          </tr>`;
-      } else {
-
-        [...rows].reverse().forEach(r => {
-
-          const fechaVisible = parseFechaSheet(r[0]);
-
-          // obtener solo la fecha
-          const fechaDia = fechaVisible.split(" ")[0];
-
-          const subtotal = Number(r[4]) || 0;
-
-          // acumular total diario
-          if (!resumenDias[fechaDia]) {
-            resumenDias[fechaDia] = 0;
-          }
-
-          resumenDias[fechaDia] += subtotal;
-
-          tbody.innerHTML += `
-            <tr>
-              <td>${fechaVisible}</td>
-              <td>${r[1] || "—"}</td>
-              <td>${r[2] || 0}</td>
-              <td>${formatCurrency(r[3])}</td>
-              <td>${formatCurrency(subtotal)}</td>
-            </tr>`;
-          });
-      }
-
-      // Mostrar resumen por día
-      let resumenHTML = "💰 Totales por día:<br><br>";
-
-      Object.keys(resumenDias)
-        .sort()
-        .reverse()
-        .forEach(fecha => {
-          resumenHTML += `
-            ${fecha}: ${formatCurrency(resumenDias[fecha])}<br>
-          `;
-        });
-
-      document.getElementById("totalesPorDia").innerHTML = resumenHTML;
-
+      renderHistorial();
       document.getElementById("historialModal").style.display = "flex";
 
     } catch (e) {
       alert("❌ No se pudo cargar el historial.");
       console.error(e);
     }
+  }
+
+  function renderHistorial() {
+    if (!historialRowsCache) return;
+
+    const desde = document.getElementById("historialDesde").value; // "yyyy-mm-dd" o vacío
+    const hasta = document.getElementById("historialHasta").value;
+
+    const rows = historialRowsCache.filter(r => {
+      const fechaDia = (r[0] || "").toString().split(" ")[0]; // "yyyy-MM-dd HH:mm:ss" -> "yyyy-MM-dd"
+      if (desde && fechaDia < desde) return false;
+      if (hasta && fechaDia > hasta) return false;
+      return true;
+    });
+
+    const tbody = document.getElementById("historialBody");
+    tbody.innerHTML = "";
+
+    const resumenDias = {};
+
+    if (rows.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align:center">
+            Sin ventas registradas en este rango de fechas.
+          </td>
+        </tr>`;
+    } else {
+
+      [...rows].reverse().forEach(r => {
+
+        const fechaVisible = parseFechaSheet(r[0]);
+
+        // obtener solo la fecha
+        const fechaDia = fechaVisible.split(" ")[0];
+
+        const subtotal = Number(r[4]) || 0;
+
+        // acumular total diario
+        if (!resumenDias[fechaDia]) {
+          resumenDias[fechaDia] = 0;
+        }
+
+        resumenDias[fechaDia] += subtotal;
+
+        tbody.innerHTML += `
+          <tr>
+            <td>${fechaVisible}</td>
+            <td>${r[1] || "—"}</td>
+            <td>${r[2] || 0}</td>
+            <td>${formatCurrency(r[3])}</td>
+            <td>${formatCurrency(subtotal)}</td>
+          </tr>`;
+        });
+    }
+
+    // Mostrar resumen por día
+    let resumenHTML = "💰 Totales por día:<br><br>";
+
+    Object.keys(resumenDias)
+      .sort()
+      .reverse()
+      .forEach(fecha => {
+        resumenHTML += `
+          ${fecha}: ${formatCurrency(resumenDias[fecha])}<br>
+        `;
+      });
+
+    document.getElementById("totalesPorDia").innerHTML = resumenHTML;
+  }
+
+  function aplicarFiltroHistorial() {
+    renderHistorial();
+  }
+
+  function limpiarFiltroHistorial() {
+    document.getElementById("historialDesde").value = "";
+    document.getElementById("historialHasta").value = "";
+    renderHistorial();
   }
 
   // Resumen modal

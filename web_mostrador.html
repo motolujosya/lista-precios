@@ -136,6 +136,96 @@
   .quotes-btn { background: linear-gradient(90deg, #6c5ce7, #a29bfe); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 6px 20px; display: block; width: calc(100% - 40px); }
   .quotes-btn:hover { transform: scale(1.02); }
 
+  /* Modal recibo */
+  #reciboModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 3000; }
+  #reciboModalContent { background: #fff; border-radius: 10px; padding: 18px; width: 92%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  #reciboPrint { font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #222; }
+  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 16px; }
+  #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #555; line-height: 1.4; }
+  #reciboPrint .recibo-linea { border-top: 1px dashed #999; margin: 8px 0; }
+  #reciboPrint .recibo-dato { font-size: 12px; margin: 2px 0; }
+  #reciboPrint table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #reciboPrint td { padding: 2px 0; vertical-align: top; }
+  #reciboPrint .recibo-total { font-size: 15px; font-weight: bold; text-align: right; margin-top: 6px; }
+  #reciboPrint .recibo-pago { text-align: right; font-size: 12px; color: #333; }
+  #reciboPrint .recibo-disclaimer { text-align: center; font-size: 10px; color: #888; margin-top: 10px; }
+  .recibo-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .recibo-modal-actions button { flex: 1; min-width: 100px; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+  .recibo-modal-actions button:first-child { background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; }
+  .recibo-modal-actions button:last-child { background: #eee; color: #333; }
+  .recibo-modal-actions .btn-copiar-whatsapp { background: linear-gradient(90deg, #25D366, #128C7E); color: #fff; }
+
+  @media print {
+    /* 🖨️ Ajustado para impresora térmica POS de 80mm.
+       Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
+       y el "width: 76mm" de #reciboModalContent por "width: 54mm". */
+    @page { size: 80mm auto; margin: 0; }
+    html, body { margin: 0; padding: 0; height: auto !important; }
+
+    /* Se saca TODO del flujo con display:none (no solo visibility:hidden).
+       Así el documento a imprimir mide lo que mide el recibo, y no hay
+       páginas "fantasma" invisibles que hagan que el navegador repita
+       el recibo en cada una (esa era la causa de los tiquetes duplicados). */
+    body * { display: none !important; }
+    #reciboModal, #reciboModal *,
+    #reciboPrint, #reciboPrint * { display: revert !important; }
+
+    #reciboModal {
+      position: static !important;
+      background: none !important;
+      width: auto !important;
+      height: auto !important;
+    }
+    #reciboModalContent {
+      box-shadow: none !important;
+      max-height: none !important;
+      overflow: visible !important;
+      width: 76mm;
+      padding: 0mm 2mm 6mm 2mm;
+    }
+    /* 🖤 Forzamos negro puro (nada de grises) y más peso de fuente.
+       En térmica los grises se "ditherean" (se simulan con puntos) y eso
+       es lo que se ve borroso/difuminado; el negro sólido imprime nítido. */
+    #reciboPrint, #reciboPrint * {
+      color: #000 !important;
+      font-weight: 600 !important;
+      -webkit-font-smoothing: none !important;
+    }
+    #reciboPrint {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    #reciboPrint h3 { font-size: 15px; font-weight: 700 !important; }
+    #reciboPrint .recibo-linea { border-top: 1.5px dashed #000 !important; }
+    #reciboPrint table { table-layout: fixed; width: 100%; }
+    #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
+    #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
+    #reciboPrint .recibo-total { font-size: 15px; }
+    .recibo-modal-actions,
+    #reciboModal .recibo-modal-actions { display: none !important; }
+  }
+
+  /* Modal Buscar Recibos */
+  #buscarRecibosModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #buscarRecibosContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 650px; max-height: 85vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  .recibos-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .recibos-filtros input { flex: 1; min-width: 130px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+  .recibos-filtros button { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .recibo-resultado-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .recibo-resultado-row .rr-info { flex: 1; min-width: 0; }
+  .recibo-resultado-row .rr-info strong { display: block; color: #333; }
+  .recibo-resultado-row .rr-info span { font-size: 12px; color: #888; }
+  .recibo-resultado-row button { background: linear-gradient(90deg, #00b09b, #96c93d); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+
+  /* Sugerencias de clientes (autocompletar) */
+  .cliente-sugerencias { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 0 0 8px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.12); z-index: 50; max-height: 180px; overflow-y: auto; }
+  .cliente-sugerencias.visible { display: block; }
+  .cliente-sugerencia-item { padding: 8px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+  .cliente-sugerencia-item:last-child { border-bottom: none; }
+  .cliente-sugerencia-item:hover, .cliente-sugerencia-item.activa { background: #f0f6ff; }
+  .cliente-sugerencia-item strong { display: block; color: #333; }
+  .cliente-sugerencia-item span { font-size: 11px; color: #888; }
+
   /* Modal historial */
   #historialModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
   #historialContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 700px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
@@ -604,6 +694,7 @@
 
 <button class="historial-btn" onclick="verHistorial()">📋 Ver historial de ventas</button>
 <button class="quotes-btn" onclick="abrirPedidosGuardados()">📁 Pedidos guardados</button>
+<button class="quotes-btn" onclick="abrirBuscarRecibos()" style="background: linear-gradient(90deg, #007bff, #00c6ff);">🔎 Buscar recibos</button>
 
 <div class="product-grid" id="productGrid"></div>
 
@@ -616,6 +707,27 @@
   </div>
   <div id="cartItems"></div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+  <!-- Datos del cliente para el recibo -->
+  <div id="datosCliente" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+    <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">🧾 Datos del cliente</div>
+    <div style="position: relative;">
+      <input id="clienteNombre" placeholder="Nombre del cliente" autocomplete="off"
+        oninput="buscarClienteSugerencias()" onfocus="buscarClienteSugerencias()"
+        style="width: 100%; margin-bottom: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
+      <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+        <input id="clienteDoc" placeholder="Cédula / NIT" autocomplete="off"
+          oninput="buscarClienteSugerencias()" onfocus="buscarClienteSugerencias()"
+          style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; min-width: 0;">
+        <input id="clienteTel" placeholder="Teléfono" style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; min-width: 0;">
+      </div>
+      <div id="clienteSugerencias" class="cliente-sugerencias"></div>
+    </div>
+    <select id="formaPago" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
+      <option value="Efectivo">💵 Efectivo</option>
+      <option value="Transferencia">🏦 Transferencia</option>
+      <option value="Tarjeta">💳 Tarjeta</option>
+    </select>
+  </div>
   <!-- NUEVO: Calculadora de cambio -->
   <div id="pagoCalculadora" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
@@ -645,6 +757,33 @@
     <button class="close-quotes" onclick="document.getElementById('quotesModal').style.display='none'">✖ Cerrar</button>
     <h3>📁 Pedidos guardados</h3>
     <div id="quotesList" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- Modal Recibo de venta (imprimible) -->
+<div id="reciboModal">
+  <div id="reciboModalContent">
+    <div id="reciboPrint"></div>
+    <div class="recibo-modal-actions">
+      <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+      <button class="btn-copiar-whatsapp" onclick="copiarReciboWhatsapp()">📋 Copiar p/ WhatsApp</button>
+      <button onclick="document.getElementById('reciboModal').style.display='none'">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Buscar Recibos -->
+<div id="buscarRecibosModal">
+  <div id="buscarRecibosContent">
+    <button class="close-quotes" onclick="document.getElementById('buscarRecibosModal').style.display='none'">✖ Cerrar</button>
+    <h3>🔎 Buscar recibos</h3>
+    <div class="recibos-filtros">
+      <input id="filtroFecha" type="date">
+      <input id="filtroNumero" type="text" placeholder="Número de recibo">
+      <input id="filtroCliente" type="text" placeholder="Nombre del cliente">
+      <button onclick="buscarRecibos()">Buscar</button>
+    </div>
+    <div id="resultadosRecibos" style="margin-top:14px;"></div>
   </div>
 </div>
 
@@ -754,6 +893,16 @@
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzumlTHwgMOANtajyuNe-TSW5CZzMXge8F1xPd-oZDRVg6wpWOWmYkCfelXvlKbBGNG8Q/exec";
+  const ENTORNO = "produccion";
+  
+
+  // ✏️ EDITA ESTOS DATOS con la información real de tu negocio (aparecen en el recibo impreso)
+  const NEGOCIO = {
+    nombre: "Moto Ya!",
+    nit: "C.C./NIT: 1.121.883.884-2",
+    direccion: "Cra 21 #14-89 — Acacias",
+    telefono: "Tel: 314 258 9098"
+  };
   
   
 
@@ -1198,6 +1347,80 @@ function mostrarSugerencias(code) {
     cartCount.style.animation = "pop 0.3s ease";
   }
 
+  // 🔎 Buscar recibos guardados en la hoja "Recibos"
+  function abrirBuscarRecibos() {
+    document.getElementById("buscarRecibosModal").style.display = "flex";
+    document.getElementById("resultadosRecibos").innerHTML = `<p style="text-align:center; color:#888;">Usa los filtros y presiona "Buscar".</p>`;
+  }
+
+  async function buscarRecibos() {
+    const cont = document.getElementById("resultadosRecibos");
+    cont.innerHTML = `<p style="text-align:center; color:#888;">Buscando...</p>`;
+
+    const fechaFiltro = document.getElementById("filtroFecha").value; // yyyy-mm-dd
+    const numeroFiltro = document.getElementById("filtroNumero").value.trim().toLowerCase();
+    const clienteFiltro = document.getElementById("filtroCliente").value.trim().toLowerCase();
+
+    try {
+      const RECIBOS_NAME = "Recibos";
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(RECIBOS_NAME)}&tqx=out:json&_=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+
+      let rows = json.table.rows.map(r => r.c.map(c => c ? (c.f || c.v) : ""));
+
+      // Columnas: Numero(0) Fecha(1) Cliente(2) Cedula(3) Telefono(4) FormaPago(5) Productos(6) Total(7) PagoCon(8) Cambio(9) ProductosJSON(10)
+      rows = rows.filter(r => {
+        const numero = (r[0] || "").toString().toLowerCase();
+        const fecha = (r[1] || "").toString(); // "yyyy-MM-dd HH:mm:ss"
+        const cliente = (r[2] || "").toString().toLowerCase();
+
+        if (numeroFiltro && !numero.includes(numeroFiltro)) return false;
+        if (clienteFiltro && !cliente.includes(clienteFiltro)) return false;
+        if (fechaFiltro && !fecha.startsWith(fechaFiltro)) return false;
+        return true;
+      });
+
+      if (rows.length === 0) {
+        cont.innerHTML = `<p style="text-align:center; color:#888;">No se encontraron recibos con esos filtros.</p>`;
+        return;
+      }
+
+      cont.innerHTML = [...rows].reverse().map(r => `
+        <div class="recibo-resultado-row">
+          <div class="rr-info">
+            <strong>Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""}</strong>
+            <span>${r[1]} · ${formatCurrency(parseFloat(r[7]) || 0)} · ${r[5] || "—"}</span>
+          </div>
+          <button onclick='reimprimirRecibo(${JSON.stringify(r).replace(/'/g, "&apos;")})'>👁️ Ver</button>
+        </div>
+      `).join("");
+
+    } catch (e) {
+      console.error(e);
+      cont.innerHTML = `<p style="text-align:center; color:#dc3545;">No se pudo consultar la hoja "Recibos". ¿Ya existe esa pestaña en tu Google Sheet? Se crea sola tras la primera venta con el Apps Script actualizado.</p>`;
+    }
+  }
+
+  function reimprimirRecibo(r) {
+    let items = [];
+    try { items = JSON.parse(r[10] || "[]"); } catch (e) { items = []; }
+
+    mostrarRecibo({
+      numero: r[0],
+      fecha: r[1],
+      clienteNombre: r[2],
+      clienteDoc: r[3],
+      clienteTel: r[4],
+      formaPago: r[5],
+      total: parseFloat(r[7]) || 0,
+      pagoCon: parseFloat(r[8]) || 0,
+      cambio: parseFloat(r[9]) || 0,
+      items
+    });
+  }
+
   // 💾 Pedidos guardados (cotizaciones) — se guardan en este navegador
   const QUOTES_KEY = "pedidosGuardados";
 
@@ -1301,28 +1524,234 @@ function mostrarSugerencias(code) {
     }
   };
 
+  // 🧾 Recibo de venta (documento interno, no factura electrónica DIAN)
+  // 🔢 Consulta el número de recibo REAL que acaba de asignar el servidor
+  // (ya no se adivina antes de vender: el backend lo asigna de forma atómica
+  // con LockService, así que aquí solo leemos el último registrado).
+  async function obtenerUltimoNumeroRecibo() {
+    try {
+      const RECIBOS_NAME = "Recibos";
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(RECIBOS_NAME)}&tqx=out:json&_=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+      const rows = json.table.rows;
+      if (rows.length === 0) return "—";
+      const ultima = rows[rows.length - 1].c;
+      return ultima[0] ? (ultima[0].f || ultima[0].v) : "—";
+    } catch (e) {
+      return "—";
+    }
+  }
+
+  let ultimoReciboData = null;
+
+  function mostrarRecibo(r) {
+    ultimoReciboData = r;
+
+    const filasHtml = r.items.map(i => `
+      <tr>
+        <td>${i.qty}x ${i.label || i.name}</td>
+        <td style="text-align:right; white-space:nowrap;">${formatCurrency(i.qty * i.price)}</td>
+      </tr>
+    `).join("");
+
+    document.getElementById("reciboPrint").innerHTML = `
+      <h3>${NEGOCIO.nombre}</h3>
+      <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
+      <div class="recibo-linea"></div>
+      <div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>
+      <div class="recibo-dato"><strong>Fecha:</strong> ${r.fecha}</div>
+      ${r.clienteNombre ? `<div class="recibo-dato"><strong>Cliente:</strong> ${r.clienteNombre}</div>` : ""}
+      ${r.clienteDoc ? `<div class="recibo-dato"><strong>Cédula/NIT:</strong> ${r.clienteDoc}</div>` : ""}
+      ${r.clienteTel ? `<div class="recibo-dato"><strong>Tel:</strong> ${r.clienteTel}</div>` : ""}
+      <div class="recibo-linea"></div>
+      <table>${filasHtml}</table>
+      <div class="recibo-linea"></div>
+      <div class="recibo-total">TOTAL: ${formatCurrency(r.total)}</div>
+      <div class="recibo-pago">Forma de pago: ${r.formaPago}</div>
+      ${r.pagoCon ? `<div class="recibo-pago">Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}</div>` : ""}
+      <div class="recibo-linea"></div>
+      <div class="recibo-disclaimer">Documento interno de venta. No constituye factura electrónica ante la DIAN.</div>
+    `;
+
+    document.getElementById("reciboModal").style.display = "flex";
+  }
+
+  // 📋 Copiar el recibo como texto plano (con formato de WhatsApp: *negrita*)
+  // listo para pegar en un chat. No abre WhatsApp directamente, solo copia.
+  function armarTextoWhatsapp(r) {
+    const lineasProductos = r.items
+      .map(i => `${i.qty}x ${i.label || i.name} - ${formatCurrency(i.qty * i.price)}`)
+      .join("\n");
+
+    let texto = `🧾 *${NEGOCIO.nombre}*\n`;
+    texto += `Recibo No: ${r.numero}\n`;
+    texto += `Fecha: ${r.fecha}\n`;
+    if (r.clienteNombre) texto += `Cliente: ${r.clienteNombre}\n`;
+    texto += `\n${lineasProductos}\n\n`;
+    texto += `*TOTAL: ${formatCurrency(r.total)}*\n`;
+    texto += `Forma de pago: ${r.formaPago}\n`;
+    if (r.pagoCon) texto += `Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}\n`;
+    texto += `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
+    return texto;
+  }
+
+  async function copiarReciboWhatsapp() {
+    if (!ultimoReciboData) return;
+    const texto = armarTextoWhatsapp(ultimoReciboData);
+
+    try {
+      await navigator.clipboard.writeText(texto);
+      showToast("📋 Recibo copiado, listo para pegar en WhatsApp");
+    } catch (e) {
+      // Respaldo para navegadores/contextos sin permiso de portapapeles moderno
+      const temp = document.createElement("textarea");
+      temp.value = texto;
+      temp.style.position = "fixed";
+      temp.style.opacity = "0";
+      document.body.appendChild(temp);
+      temp.focus();
+      temp.select();
+      try {
+        document.execCommand("copy");
+        showToast("📋 Recibo copiado, listo para pegar en WhatsApp");
+      } catch (e2) {
+        alert("No se pudo copiar automáticamente. Copia el texto manualmente:\n\n" + texto);
+      }
+      document.body.removeChild(temp);
+    }
+  }
+
+  // 👤 Autocompletar clientes guardados (hoja "Clientes")
+  let clientesCache = null;
+  let clientesCacheTime = 0;
+
+  async function obtenerClientesCache() {
+    // Se refresca cada 2 minutos como máximo, para no golpear el Sheet en cada tecla
+    if (clientesCache && (Date.now() - clientesCacheTime < 120000)) return clientesCache;
+    try {
+      const CLIENTES_NAME = "Clientes";
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(CLIENTES_NAME)}&tqx=out:json&_=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+      clientesCache = json.table.rows.map(r => ({
+        cedula: r.c[0] ? (r.c[0].f || r.c[0].v || "").toString() : "",
+        nombre: r.c[1] ? (r.c[1].f || r.c[1].v || "").toString() : "",
+        telefono: r.c[2] ? (r.c[2].f || r.c[2].v || "").toString() : ""
+      }));
+      clientesCacheTime = Date.now();
+    } catch (e) {
+      clientesCache = clientesCache || [];
+    }
+    return clientesCache;
+  }
+
+  async function buscarClienteSugerencias() {
+    const nombreVal = document.getElementById("clienteNombre").value.trim().toLowerCase();
+    const docVal = document.getElementById("clienteDoc").value.trim().toLowerCase();
+    const cont = document.getElementById("clienteSugerencias");
+
+    if (!nombreVal && !docVal) {
+      cont.classList.remove("visible");
+      return;
+    }
+
+    const clientes = await obtenerClientesCache();
+    const coincidencias = clientes.filter(c =>
+      (nombreVal && c.nombre.toLowerCase().includes(nombreVal)) ||
+      (docVal && c.cedula.toLowerCase().includes(docVal))
+    ).slice(0, 6);
+
+    if (coincidencias.length === 0) {
+      cont.classList.remove("visible");
+      cont.innerHTML = "";
+      return;
+    }
+
+    cont.innerHTML = coincidencias.map(c => `
+      <div class="cliente-sugerencia-item" onmousedown="seleccionarClienteSugerido('${c.cedula.replace(/'/g, "&apos;")}')">
+        <strong>${c.nombre || "(sin nombre)"}</strong>
+        <span>${c.cedula || "sin cédula"}${c.telefono ? " · " + c.telefono : ""}</span>
+      </div>
+    `).join("");
+    cont.classList.add("visible");
+  }
+
+  async function seleccionarClienteSugerido(cedula) {
+    const clientes = await obtenerClientesCache();
+    const c = clientes.find(x => x.cedula === cedula);
+    if (!c) return;
+    document.getElementById("clienteNombre").value = c.nombre || "";
+    document.getElementById("clienteDoc").value = c.cedula || "";
+    document.getElementById("clienteTel").value = c.telefono || "";
+    document.getElementById("clienteSugerencias").classList.remove("visible");
+  }
+
+  // Cierra el listado de sugerencias al hacer clic fuera (onmousedown en las
+  // sugerencias ya se dispara antes de este blur, así que no hay conflicto)
+  document.getElementById("clienteNombre").addEventListener("blur", () => {
+    setTimeout(() => document.getElementById("clienteSugerencias").classList.remove("visible"), 150);
+  });
+  document.getElementById("clienteDoc").addEventListener("blur", () => {
+    setTimeout(() => document.getElementById("clienteSugerencias").classList.remove("visible"), 150);
+  });
+
   // ✅ Finalizar compra
   document.getElementById("checkoutBtn").onclick = async () => {
   if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+
+  const clienteNombre = document.getElementById("clienteNombre").value.trim();
+  const clienteDoc = document.getElementById("clienteDoc").value.trim();
+  const clienteTel = document.getElementById("clienteTel").value.trim();
+
+  // Si se empezó a llenar algún dato del cliente, nombre y cédula son obligatorios
+  // (el teléfono se mantiene opcional). Si no se llenó nada, la venta puede
+  // seguir siendo anónima, sin problema.
+  if ((clienteNombre || clienteDoc || clienteTel) && (!clienteNombre || !clienteDoc)) {
+    alert("⚠️ Si vas a registrar un cliente, el nombre y la cédula/NIT son obligatorios.");
+    document.getElementById(clienteNombre ? "clienteDoc" : "clienteNombre").focus();
+    return;
+  }
+
   if (!confirm(`¿Confirmar compra de ${cart.reduce((s,i)=>s+i.qty,0)} productos?`)) return;
 
   const btn = document.getElementById("checkoutBtn");
   btn.disabled = true;
   btn.textContent = "⏳ Procesando...";
 
-  const data = {
-    items: cart.map(i => ({
-      code: i.code,
-      name: i.name,
-      label: i.label,
-      qty: parseInt(i.qty),
-      price: Math.round(parseFloat(i.price))
-    }))
-  };
+  // Datos capturados para el recibo y para el registro en la hoja "Recibos"
+  const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+  const formaPago = document.getElementById("formaPago").value;
+  const pagoCon = parseFloat(document.getElementById("pagoCliente").value) || 0;
+  const cambio = pagoCon > total ? pagoCon - total : 0;
 
-  console.log("📦 Enviando al servidor:", JSON.stringify(data));
+  console.log("📦 Preparando venta...");
 
   try {
+    const data = {
+      entorno: ENTORNO,
+      total,
+      formaPago,
+      pagoCon,
+      cambio,
+      cliente: {
+        nombre: clienteNombre,
+        cedula: clienteDoc,
+        telefono: clienteTel
+      },
+      items: cart.map(i => ({
+        code: i.code,
+        name: i.name,
+        label: i.label,
+        qty: parseInt(i.qty),
+        price: Math.round(parseFloat(i.price))
+      }))
+    };
+
+    console.log("📦 Enviando al servidor:", JSON.stringify(data));
+
     const response = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
       mode: "no-cors",
@@ -1334,10 +1763,32 @@ function mostrarSugerencias(code) {
     console.log("Tipo:", response.type); // con no-cors siempre será "opaque"
 
     showToast("✅ ¡Compra finalizada! Inventario actualizado.");
+
+    // Pequeña espera para que la hoja de Google ya refleje el recibo
+    // recién escrito por el servidor antes de consultarlo (mismo patrón
+    // que ya se usaba para recargar el catálogo tras vender).
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const numeroRecibo = await obtenerUltimoNumeroRecibo();
+
+    mostrarRecibo({
+      numero: numeroRecibo,
+      fecha: new Date().toLocaleString(),
+      items: JSON.parse(JSON.stringify(cart)),
+      total,
+      clienteNombre, clienteDoc, clienteTel,
+      formaPago, pagoCon, cambio
+    });
+
     cart = [];
     updateCartDisplay();
 
-    // Limpia el input y actualiza los textos visuales tras la compra
+    // Limpia los campos y actualiza los textos visuales tras la compra
+    document.getElementById("clienteNombre").value = "";
+    document.getElementById("clienteDoc").value = "";
+    document.getElementById("clienteTel").value = "";
+    document.getElementById("clienteSugerencias").classList.remove("visible");
+    clientesCacheTime = 0; // fuerza a releer "Clientes" en la próxima búsqueda (por si se guardó/actualizó uno nuevo)
+    document.getElementById("formaPago").value = "Efectivo";
     const inputPago = document.getElementById("pagoCliente");
     inputPago.value = "";
     if (typeof inputPago.oninput === "function") inputPago.oninput();

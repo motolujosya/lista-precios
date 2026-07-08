@@ -892,7 +892,10 @@
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwY5Qyszf78kSb7-93CvxpWr95EE0dMgLP3NhammSjXeNyPDY7phFTNEg8RgAkfhnZcEQ/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxLQ3WPlAlvHlD9sunvCFYv5kjkpBzmjVKPSKYiLsT9/dev";
+  
+  const ENTORNO = "prueba";
+  
 
   // ✏️ EDITA ESTOS DATOS con la información real de tu negocio (aparecen en el recibo impreso)
   const NEGOCIO = {
@@ -1729,6 +1732,7 @@ function mostrarSugerencias(code) {
 
   try {
     const data = {
+      entorno: ENTORNO,
       total,
       formaPago,
       pagoCon,

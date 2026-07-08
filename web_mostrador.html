@@ -211,11 +211,23 @@
   .recibos-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .recibos-filtros input { flex: 1; min-width: 130px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
   .recibos-filtros button { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-  .recibo-resultado-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  .recibo-resultado-row .rr-info { flex: 1; min-width: 0; }
+  .recibo-resultado-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); flex-wrap: wrap; gap: 8px; }
+  .recibo-resultado-row .rr-info { flex: 1; min-width: 150px; }
   .recibo-resultado-row .rr-info strong { display: block; color: #333; }
   .recibo-resultado-row .rr-info span { font-size: 12px; color: #888; }
+  .recibo-resultado-row .rr-botones { display: flex; gap: 6px; flex-shrink: 0; }
   .recibo-resultado-row button { background: linear-gradient(90deg, #00b09b, #96c93d); color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+  .recibo-resultado-row .btn-devolver { background: linear-gradient(90deg, #ff9800, #ff5722); }
+  .badge-devolucion { background: #ffe8d6; color: #d35400; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
+
+  /* Modal Devolución */
+  #devolucionModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); justify-content: center; align-items: center; z-index: 2500; }
+  #devolucionContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 480px; max-height: 85vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  .devolucion-item-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #f8f9fa; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+  .devolucion-item-row .di-info { flex: 1; min-width: 0; font-size: 13px; }
+  .devolucion-item-row .di-info strong { display: block; color: #333; }
+  .devolucion-item-row .di-info span { font-size: 11px; color: #888; }
+  .devolucion-item-row input[type="number"] { width: 60px; padding: 6px; border-radius: 6px; border: 1px solid #ccc; text-align: center; }
 
   /* Sugerencias de clientes (autocompletar) */
   .cliente-sugerencias { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 0 0 8px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.12); z-index: 50; max-height: 180px; overflow-y: auto; }
@@ -789,6 +801,20 @@
       <button onclick="buscarRecibos()">Buscar</button>
     </div>
     <div id="resultadosRecibos" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- Modal Registrar Devolución -->
+<div id="devolucionModal">
+  <div id="devolucionContent">
+    <button class="close-quotes" onclick="document.getElementById('devolucionModal').style.display='none'">✖ Cerrar</button>
+    <h3>↩️ Registrar devolución</h3>
+    <div id="devolucionInfo" style="font-size:13px; color:#555; margin-bottom:10px;"></div>
+    <div id="devolucionItems"></div>
+    <label style="display:block; margin-top:10px; font-size:13px; color:#555;">Motivo (opcional)
+      <input id="devolucionMotivo" type="text" placeholder="Ej: producto defectuoso" style="width:100%; margin-top:4px; padding:8px; border-radius:6px; border:1px solid #ccc; box-sizing:border-box;">
+    </label>
+    <button id="confirmarDevolucionBtn" onclick="confirmarDevolucion()" style="margin-top:14px; width:100%; background: linear-gradient(90deg, #ff9800, #ff5722); color:#fff; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">Confirmar devolución</button>
   </div>
 </div>
 
@@ -1381,7 +1407,7 @@ function mostrarSugerencias(code) {
 
       let rows = json.table.rows.map(r => r.c.map(c => c ? (c.f || c.v) : ""));
 
-      // Columnas: Numero(0) Fecha(1) Cliente(2) Cedula(3) Telefono(4) FormaPago(5) Productos(6) Total(7) PagoCon(8) Cambio(9) ProductosJSON(10)
+      // Columnas: Numero(0) Fecha(1) Cliente(2) Cedula(3) Telefono(4) FormaPago(5) Productos(6) Total(7) PagoCon(8) Cambio(9) ProductosJSON(10) Tipo(11) ReciboOriginal(12)
       rows = rows.filter(r => {
         const numero = (r[0] || "").toString().toLowerCase();
         const fecha = (r[1] || "").toString(); // "yyyy-MM-dd HH:mm:ss"
@@ -1398,20 +1424,157 @@ function mostrarSugerencias(code) {
         return;
       }
 
-      cont.innerHTML = [...rows].reverse().map(r => `
+      cont.innerHTML = [...rows].reverse().map(r => {
+        const esDevolucion = r[11] === "Devolucion";
+        const badge = esDevolucion
+          ? `<span class="badge-devolucion">↩️ Devolución</span>`
+          : "";
+        return `
         <div class="recibo-resultado-row">
           <div class="rr-info">
-            <strong>Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""}</strong>
+            <strong>Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""} ${badge}</strong>
             <span>${r[1]} · ${formatCurrency(parseFloat(r[7]) || 0)} · ${r[5] || "—"}</span>
           </div>
-          <button onclick='reimprimirRecibo(${JSON.stringify(r).replace(/'/g, "&apos;")})'>👁️ Ver</button>
+          <div class="rr-botones">
+            <button onclick='reimprimirRecibo(${JSON.stringify(r).replace(/'/g, "&apos;")})'>👁️ Ver</button>
+            ${!esDevolucion ? `<button class="btn-devolver" onclick='abrirDevolucion(${JSON.stringify(r).replace(/'/g, "&apos;")})'>↩️ Devolución</button>` : ""}
+          </div>
         </div>
-      `).join("");
+      `;
+      }).join("");
 
     } catch (e) {
       console.error(e);
       cont.innerHTML = `<p style="text-align:center; color:#dc3545;">No se pudo consultar la hoja "Recibos". ¿Ya existe esa pestaña en tu Google Sheet? Se crea sola tras la primera venta con el Apps Script actualizado.</p>`;
     }
+  }
+
+  // ↩️ Registrar devolución (parcial, por producto, sin borrar nada)
+  let devolucionContexto = null;
+
+  function abrirDevolucion(r) {
+    let items = [];
+    try { items = JSON.parse(r[10] || "[]"); } catch (e) { items = []; }
+
+    if (items.length === 0) {
+      alert("No hay detalle de productos guardado para este recibo (es de una venta anterior a esta función).");
+      return;
+    }
+
+    devolucionContexto = { numeroOriginal: (r[0] || "").toString(), items };
+
+    document.getElementById("devolucionInfo").innerHTML =
+      `Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""} · ${r[1]}`;
+
+    document.getElementById("devolucionItems").innerHTML = items.map((it, idx) => `
+      <div class="devolucion-item-row">
+        <div class="di-info">
+          <strong>${it.label || it.name}</strong>
+          <span>Vendido: ${it.qty} x ${formatCurrency(it.price)}</span>
+        </div>
+        <input type="number" min="0" max="${it.qty}" value="0" data-idx="${idx}" class="devolucion-qty-input">
+      </div>
+    `).join("");
+
+    document.getElementById("devolucionMotivo").value = "";
+    document.getElementById("devolucionModal").style.display = "flex";
+  }
+
+  async function confirmarDevolucion() {
+    if (!devolucionContexto) return;
+
+    const inputs = document.querySelectorAll(".devolucion-qty-input");
+    const itemsADevolver = [];
+
+    inputs.forEach(inp => {
+      const qty = parseInt(inp.value) || 0;
+      if (qty > 0) {
+        const item = devolucionContexto.items[parseInt(inp.dataset.idx)];
+        itemsADevolver.push({
+          code: item.code,
+          name: item.name,
+          label: item.label,
+          qty,
+          price: item.price
+        });
+      }
+    });
+
+    if (itemsADevolver.length === 0) {
+      alert("⚠️ Indica la cantidad a devolver de al menos un producto.");
+      return;
+    }
+
+    const btn = document.getElementById("confirmarDevolucionBtn");
+    btn.disabled = true;
+    btn.textContent = "⏳ Procesando...";
+
+    const numeroOriginal = devolucionContexto.numeroOriginal;
+    const motivo = document.getElementById("devolucionMotivo").value.trim();
+
+    try {
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "registrarDevolucion",
+          numeroReciboOriginal: numeroOriginal,
+          motivo,
+          entorno: ENTORNO,
+          items: itemsADevolver
+        })
+      });
+
+      // Como el POST es "no-cors" no podemos leer si el servidor la aceptó
+      // o la rechazó (ej. por intentar devolver más de lo vendido). Se
+      // espera un momento y se confirma consultando "Recibos" directamente.
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const RECIBOS_NAME = "Recibos";
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(RECIBOS_NAME)}&tqx=out:json&_=${Date.now()}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+      const rows = json.table.rows.map(r => r.c.map(c => c ? (c.f || c.v) : ""));
+      const ultima = rows[rows.length - 1];
+
+      const seConfirmo = ultima
+        && ultima[11] === "Devolucion"
+        && (ultima[12] || "").toString() === numeroOriginal.toString();
+
+      if (seConfirmo) {
+        showToast("✅ Devolución registrada e inventario actualizado.");
+        document.getElementById("devolucionModal").style.display = "none";
+
+        let itemsDevueltos = [];
+        try { itemsDevueltos = JSON.parse(ultima[10] || "[]"); } catch (e) {}
+
+        mostrarRecibo({
+          numero: ultima[0],
+          fecha: ultima[1],
+          clienteNombre: ultima[2],
+          clienteDoc: ultima[3],
+          clienteTel: ultima[4],
+          formaPago: ultima[5],
+          total: parseFloat(ultima[7]) || 0,
+          pagoCon: 0,
+          cambio: 0,
+          items: itemsDevueltos,
+          tipo: "Devolucion",
+          reciboOriginal: numeroOriginal
+        });
+      } else {
+        alert("⚠️ No se pudo confirmar automáticamente la devolución. Es posible que se haya rechazado (por ejemplo, si la cantidad supera lo disponible para devolver). Revisa la hoja \"Recibos\" o el panel de Ejecuciones de Apps Script para confirmar qué pasó.");
+      }
+
+    } catch (e) {
+      console.error(e);
+      alert("❌ Error al procesar la devolución: " + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = "Confirmar devolución";
   }
 
   function reimprimirRecibo(r) {
@@ -1428,7 +1591,9 @@ function mostrarSugerencias(code) {
       total: parseFloat(r[7]) || 0,
       pagoCon: parseFloat(r[8]) || 0,
       cambio: parseFloat(r[9]) || 0,
-      items
+      items,
+      tipo: r[11] || "Venta",
+      reciboOriginal: r[12] || ""
     });
   }
 
@@ -1559,19 +1724,23 @@ function mostrarSugerencias(code) {
 
   function mostrarRecibo(r) {
     ultimoReciboData = r;
+    const esDevolucion = r.tipo === "Devolucion";
+    const signo = esDevolucion ? -1 : 1;
 
     const filasHtml = r.items.map(i => `
       <tr>
         <td>${i.qty}x ${i.label || i.name}</td>
-        <td style="text-align:right; white-space:nowrap;">${formatCurrency(i.qty * i.price)}</td>
+        <td style="text-align:right; white-space:nowrap;">${formatCurrency(signo * i.qty * i.price)}</td>
       </tr>
     `).join("");
 
     document.getElementById("reciboPrint").innerHTML = `
-      <h3>${NEGOCIO.nombre}</h3>
+      <h3>${esDevolucion ? "↩️ NOTA DE DEVOLUCIÓN" : NEGOCIO.nombre}</h3>
+      ${esDevolucion ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
       <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
       <div class="recibo-linea"></div>
       <div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>
+      ${esDevolucion && r.reciboOriginal ? `<div class="recibo-dato"><strong>Devolución del recibo:</strong> #${r.reciboOriginal}</div>` : ""}
       <div class="recibo-dato"><strong>Fecha:</strong> ${r.fecha}</div>
       ${r.clienteNombre ? `<div class="recibo-dato"><strong>Cliente:</strong> ${r.clienteNombre}</div>` : ""}
       ${r.clienteDoc ? `<div class="recibo-dato"><strong>Cédula/NIT:</strong> ${r.clienteDoc}</div>` : ""}
@@ -1579,11 +1748,11 @@ function mostrarSugerencias(code) {
       <div class="recibo-linea"></div>
       <table>${filasHtml}</table>
       <div class="recibo-linea"></div>
-      <div class="recibo-total">TOTAL: ${formatCurrency(r.total)}</div>
-      <div class="recibo-pago">Forma de pago: ${r.formaPago}</div>
+      <div class="recibo-total">${esDevolucion ? "TOTAL DEVUELTO" : "TOTAL"}: ${formatCurrency(Math.abs(r.total))}</div>
+      ${!esDevolucion ? `<div class="recibo-pago">Forma de pago: ${r.formaPago}</div>` : ""}
       ${r.pagoCon ? `<div class="recibo-pago">Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}</div>` : ""}
       <div class="recibo-linea"></div>
-      <div class="recibo-disclaimer">Documento interno de venta. No constituye factura electrónica ante la DIAN.</div>
+      <div class="recibo-disclaimer">${esDevolucion ? "Documento interno de devolución. No constituye nota crédito electrónica ante la DIAN." : "Documento interno de venta. No constituye factura electrónica ante la DIAN."}</div>
     `;
 
     document.getElementById("reciboModal").style.display = "flex";
@@ -1592,19 +1761,29 @@ function mostrarSugerencias(code) {
   // 📋 Copiar el recibo como texto plano (con formato de WhatsApp: *negrita*)
   // listo para pegar en un chat. No abre WhatsApp directamente, solo copia.
   function armarTextoWhatsapp(r) {
+    const esDevolucion = r.tipo === "Devolucion";
+    const signo = esDevolucion ? -1 : 1;
+
     const lineasProductos = r.items
-      .map(i => `${i.qty}x ${i.label || i.name} - ${formatCurrency(i.qty * i.price)}`)
+      .map(i => `${i.qty}x ${i.label || i.name} - ${formatCurrency(signo * i.qty * i.price)}`)
       .join("\n");
 
-    let texto = `🧾 *${NEGOCIO.nombre}*\n`;
+    let texto = esDevolucion
+      ? `↩️ *NOTA DE DEVOLUCIÓN — ${NEGOCIO.nombre}*\n`
+      : `🧾 *${NEGOCIO.nombre}*\n`;
     texto += `Recibo No: ${r.numero}\n`;
+    if (esDevolucion && r.reciboOriginal) texto += `Devolución del recibo: #${r.reciboOriginal}\n`;
     texto += `Fecha: ${r.fecha}\n`;
     if (r.clienteNombre) texto += `Cliente: ${r.clienteNombre}\n`;
     texto += `\n${lineasProductos}\n\n`;
-    texto += `*TOTAL: ${formatCurrency(r.total)}*\n`;
-    texto += `Forma de pago: ${r.formaPago}\n`;
+    texto += esDevolucion
+      ? `*TOTAL DEVUELTO: ${formatCurrency(Math.abs(r.total))}*\n`
+      : `*TOTAL: ${formatCurrency(r.total)}*\n`;
+    if (!esDevolucion) texto += `Forma de pago: ${r.formaPago}\n`;
     if (r.pagoCon) texto += `Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}\n`;
-    texto += `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
+    texto += esDevolucion
+      ? `\n_Documento interno de devolución, no constituye nota crédito electrónica ante la DIAN._`
+      : `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
     return texto;
   }
 

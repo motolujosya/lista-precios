@@ -208,6 +208,10 @@
       width: 100px !important;
       height: 100px !important;
     }
+    /* La librería del QR genera un <canvas> (oculto) y un <img> (visible).
+       El "display: revert" de arriba reactiva ese canvas oculto y aparecen
+       dos QR pegados; aquí lo volvemos a ocultar solo en impresión. */
+    #reciboPrint .recibo-qr canvas { display: none !important; }
     .recibo-modal-actions,
     #reciboModal .recibo-modal-actions { display: none !important; }
   }

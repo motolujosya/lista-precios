@@ -149,6 +149,9 @@
   #reciboPrint .recibo-total { font-size: 15px; font-weight: bold; text-align: right; margin-top: 6px; }
   #reciboPrint .recibo-pago { text-align: right; font-size: 12px; color: #333; }
   #reciboPrint .recibo-disclaimer { text-align: center; font-size: 10px; color: #888; margin-top: 10px; }
+  #reciboPrint .recibo-qr { text-align: center; margin-top: 12px; }
+  #reciboPrint .recibo-qr img, #reciboPrint .recibo-qr canvas { display: inline-block; }
+  #reciboPrint .recibo-qr-label { font-size: 10px; color: #555; margin-top: 4px; }
   .recibo-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .recibo-modal-actions button { flex: 1; min-width: 100px; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
   .recibo-modal-actions button:first-child { background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; }
@@ -195,12 +198,16 @@
       font-size: 13px;
       line-height: 1.4;
     }
-    #reciboPrint h3 { font-size: 15px; font-weight: 700 !important; }
+    #reciboPrint h3 { font-size: 20px; font-weight: 700 !important; }
     #reciboPrint .recibo-linea { border-top: 1.5px dashed #000 !important; }
     #reciboPrint table { table-layout: fixed; width: 100%; }
     #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
     #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
     #reciboPrint .recibo-total { font-size: 15px; }
+    #reciboPrint .recibo-qr img, #reciboPrint .recibo-qr canvas {
+      width: 100px !important;
+      height: 100px !important;
+    }
     .recibo-modal-actions,
     #reciboModal .recibo-modal-actions { display: none !important; }
   }
@@ -956,6 +963,8 @@
   <img id="lightbox-img" src="" alt="">
 </div>
 
+<!-- Librería para generar el QR de WhatsApp en el recibo/cotización -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
@@ -968,7 +977,11 @@
     nombre: "Moto Ya!",
     nit: "C.C./NIT: 1.121.883.884-2",
     direccion: "Cra 21 #14-89 — Acacias",
-    telefono: "Tel: 314 258 9098"
+    telefono: "Tel: 314 258 9098",
+    // 👉 Número de WhatsApp para el QR del recibo/cotización, en formato
+    // internacional SIN espacios, signos ni el "+" (código de país + número).
+    // Verifica que sea el correcto antes de imprimir.
+    whatsapp: "573142589098"
   };
   
   
@@ -1925,9 +1938,48 @@ function mostrarSugerencias(code) {
         esCotizacion ? "Documento informativo. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario. No constituye factura de venta." :
         "Documento interno de venta. No constituye factura electrónica ante la DIAN."
       }</div>
+      <div class="recibo-qr" id="reciboQRContainer">
+        <div id="reciboQR"></div>
+        <div class="recibo-qr-label">📲 Escanéalo y escríbenos por WhatsApp</div>
+      </div>
     `;
 
     document.getElementById("reciboModal").style.display = "flex";
+    generarQRWhatsapp(r);
+  }
+
+  // 📲 Genera el QR que abre un chat de WhatsApp con el negocio, con un
+  // mensaje pre-armado según sea venta, devolución o cotización.
+  function generarQRWhatsapp(r) {
+    const contenedor = document.getElementById("reciboQR");
+    if (!contenedor) return;
+    contenedor.innerHTML = "";
+
+    if (!NEGOCIO.whatsapp) return; // sin número configurado, no se genera QR
+
+    let mensaje;
+    if (r.tipo === "Cotizacion") {
+      mensaje = "Hola, quiero consultar sobre esta cotización";
+    } else if (r.tipo === "Devolucion") {
+      mensaje = `Hola, tengo una consulta sobre mi devolución${r.numero ? " #" + r.numero : ""}`;
+    } else {
+      mensaje = `Hola, tengo una consulta sobre mi compra${r.numero ? " #" + r.numero : ""}`;
+    }
+
+    const url = `https://wa.me/${NEGOCIO.whatsapp}?text=${encodeURIComponent(mensaje)}`;
+
+    if (typeof QRCode === "undefined") {
+      // La librería no cargó (por ejemplo, sin internet al momento de imprimir)
+      contenedor.textContent = "";
+      return;
+    }
+
+    new QRCode(contenedor, {
+      text: url,
+      width: 110,
+      height: 110,
+      correctLevel: QRCode.CorrectLevel.M
+    });
   }
 
   // 📋 Copiar el recibo como texto plano (con formato de WhatsApp: *negrita*)

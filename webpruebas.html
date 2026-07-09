@@ -791,6 +791,7 @@
      border-top:1px solid #eee;"></div>
   <div class="cart-actions">
     <button id="viewSummaryBtn" class="summary-btn">🧾 Resumen</button>
+    <button id="cotizacionBtn" class="summary-btn" style="background: linear-gradient(90deg, #6f42c1, #a855f7);">🖨️ Cotización</button>
     <button id="saveQuoteBtn" class="summary-btn save-quote-btn">💾 Guardar pedido</button>
     <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar</button>
     <button id="checkoutBtn" class="checkout-btn">✅ Finalizar compra</button>
@@ -1752,6 +1753,28 @@ function mostrarSugerencias(code) {
     showToast("💾 Pedido guardado. Puedes recuperarlo en 'Pedidos guardados'.");
   };
 
+  // 🖨️ Generar cotización imprimible del carrito, SIN registrar venta ni
+  // afectar el inventario. Sirve para clientes que solo quieren conocer precios.
+  document.getElementById("cotizacionBtn").onclick = () => {
+    if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+
+    const clienteNombre = document.getElementById("clienteNombre").value.trim();
+    const clienteDoc = document.getElementById("clienteDoc").value.trim();
+    const clienteTel = document.getElementById("clienteTel").value.trim();
+
+    const subtotal = getCartSubtotal();
+    const total = getCartTotal();
+    const descuento = subtotal - total;
+
+    mostrarRecibo({
+      tipo: "Cotizacion",
+      fecha: new Date().toLocaleString(),
+      items: JSON.parse(JSON.stringify(cart)),
+      subtotal, descuento, total,
+      clienteNombre, clienteDoc, clienteTel
+    });
+  };
+
   function abrirPedidosGuardados() {
     renderQuotesList();
     document.getElementById("quotesModal").style.display = "flex";
@@ -1861,6 +1884,7 @@ function mostrarSugerencias(code) {
   function mostrarRecibo(r) {
     ultimoReciboData = r;
     const esDevolucion = r.tipo === "Devolucion";
+    const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
     const filasHtml = r.items.map(i => `
@@ -1870,12 +1894,16 @@ function mostrarSugerencias(code) {
       </tr>
     `).join("");
 
+    let titulo = NEGOCIO.nombre;
+    if (esDevolucion) titulo = "↩️ NOTA DE DEVOLUCIÓN";
+    if (esCotizacion) titulo = "🧾 COTIZACIÓN";
+
     document.getElementById("reciboPrint").innerHTML = `
-      <h3>${esDevolucion ? "↩️ NOTA DE DEVOLUCIÓN" : NEGOCIO.nombre}</h3>
-      ${esDevolucion ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
+      <h3>${titulo}</h3>
+      ${(esDevolucion || esCotizacion) ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
       <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
       <div class="recibo-linea"></div>
-      <div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>
+      ${!esCotizacion ? `<div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>` : ""}
       ${esDevolucion && r.reciboOriginal ? `<div class="recibo-dato"><strong>Devolución del recibo:</strong> #${r.reciboOriginal}</div>` : ""}
       <div class="recibo-dato"><strong>Fecha:</strong> ${r.fecha}</div>
       ${r.clienteNombre ? `<div class="recibo-dato"><strong>Cliente:</strong> ${r.clienteNombre}</div>` : ""}
@@ -1888,11 +1916,15 @@ function mostrarSugerencias(code) {
       <div class="recibo-pago">Subtotal: ${formatCurrency(r.subtotal)}</div>
       <div class="recibo-pago">Descuento: -${formatCurrency(r.descuento)}</div>
       ` : ""}
-      <div class="recibo-total">${esDevolucion ? "TOTAL DEVUELTO" : "TOTAL"}: ${formatCurrency(Math.abs(r.total))}</div>
-      ${!esDevolucion ? `<div class="recibo-pago">Forma de pago: ${r.formaPago}</div>` : ""}
+      <div class="recibo-total">${esDevolucion ? "TOTAL DEVUELTO" : (esCotizacion ? "TOTAL COTIZADO" : "TOTAL")}: ${formatCurrency(Math.abs(r.total))}</div>
+      ${(!esDevolucion && !esCotizacion) ? `<div class="recibo-pago">Forma de pago: ${r.formaPago}</div>` : ""}
       ${r.pagoCon ? `<div class="recibo-pago">Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}</div>` : ""}
       <div class="recibo-linea"></div>
-      <div class="recibo-disclaimer">${esDevolucion ? "Documento interno de devolución. No constituye nota crédito electrónica ante la DIAN." : "Documento interno de venta. No constituye factura electrónica ante la DIAN."}</div>
+      <div class="recibo-disclaimer">${
+        esDevolucion ? "Documento interno de devolución. No constituye nota crédito electrónica ante la DIAN." :
+        esCotizacion ? "Documento informativo. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario. No constituye factura de venta." :
+        "Documento interno de venta. No constituye factura electrónica ante la DIAN."
+      }</div>
     `;
 
     document.getElementById("reciboModal").style.display = "flex";
@@ -1902,6 +1934,7 @@ function mostrarSugerencias(code) {
   // listo para pegar en un chat. No abre WhatsApp directamente, solo copia.
   function armarTextoWhatsapp(r) {
     const esDevolucion = r.tipo === "Devolucion";
+    const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
     const lineasProductos = r.items
@@ -1910,8 +1943,10 @@ function mostrarSugerencias(code) {
 
     let texto = esDevolucion
       ? `↩️ *NOTA DE DEVOLUCIÓN — ${NEGOCIO.nombre}*\n`
-      : `🧾 *${NEGOCIO.nombre}*\n`;
-    texto += `Recibo No: ${r.numero}\n`;
+      : esCotizacion
+        ? `🧾 *COTIZACIÓN — ${NEGOCIO.nombre}*\n`
+        : `🧾 *${NEGOCIO.nombre}*\n`;
+    if (!esCotizacion) texto += `Recibo No: ${r.numero}\n`;
     if (esDevolucion && r.reciboOriginal) texto += `Devolución del recibo: #${r.reciboOriginal}\n`;
     texto += `Fecha: ${r.fecha}\n`;
     if (r.clienteNombre) texto += `Cliente: ${r.clienteNombre}\n`;
@@ -1922,12 +1957,16 @@ function mostrarSugerencias(code) {
     }
     texto += esDevolucion
       ? `*TOTAL DEVUELTO: ${formatCurrency(Math.abs(r.total))}*\n`
-      : `*TOTAL: ${formatCurrency(r.total)}*\n`;
-    if (!esDevolucion) texto += `Forma de pago: ${r.formaPago}\n`;
+      : esCotizacion
+        ? `*TOTAL COTIZADO: ${formatCurrency(r.total)}*\n`
+        : `*TOTAL: ${formatCurrency(r.total)}*\n`;
+    if (!esDevolucion && !esCotizacion) texto += `Forma de pago: ${r.formaPago}\n`;
     if (r.pagoCon) texto += `Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}\n`;
     texto += esDevolucion
       ? `\n_Documento interno de devolución, no constituye nota crédito electrónica ante la DIAN._`
-      : `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
+      : esCotizacion
+        ? `\n_Cotización informativa. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario._`
+        : `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
     return texto;
   }
 

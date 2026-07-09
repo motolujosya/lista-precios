@@ -723,7 +723,36 @@
     <button id="closeCartBtn" class="close-cart">Cerrar</button>
   </div>
   <div id="cartItems"></div>
+
+  <div class="cart-subtotal-row" id="cartSubtotalRow" style="display:none; justify-content:space-between; font-size:13px; color:#666;">
+    <span>Subtotal:</span><span id="cartSubtotal">$0</span>
+  </div>
+  <div class="cart-discount-row" id="cartDiscountRow" style="display:none; justify-content:space-between; font-size:13px; color:#dc3545; margin-bottom:4px;">
+    <span>Descuento:</span><span id="cartDiscountAmount">-$0</span>
+  </div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+
+  <!-- Ajustar total del carrito: por porcentaje de descuento o valor manual -->
+  <div id="descuentoCarrito" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+    <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">💲 Ajustar total del carrito</div>
+
+    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+      <label for="descuentoPorcentaje" style="font-size: 12px; color: #555; flex: 1;">Descuento %</label>
+      <input id="descuentoPorcentaje" type="number" min="0" max="100" step="1" placeholder="0"
+        style="width: 70px; padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc; text-align: right; box-sizing: border-box;">
+      <button id="aplicarDescuentoBtn" style="padding: 4px 8px; border: none; border-radius: 6px; background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; cursor: pointer; font-size: 12px;">Aplicar</button>
+    </div>
+
+    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+      <label for="totalManual" style="font-size: 12px; color: #555; flex: 1;">Total manual</label>
+      <input id="totalManual" type="number" min="0" step="any" placeholder="$"
+        style="width: 90px; padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc; text-align: right; box-sizing: border-box;">
+      <button id="aplicarTotalManualBtn" style="padding: 4px 8px; border: none; border-radius: 6px; background: linear-gradient(90deg, #00b09b, #96c93d); color: #fff; cursor: pointer; font-size: 12px;">Aplicar</button>
+    </div>
+
+    <button id="quitarDescuentoBtn" style="width: 100%; padding: 5px 6px; border: none; border-radius: 6px; background: #eee; color: #555; cursor: pointer; font-size: 12px;">↩️ Quitar descuento / restaurar total</button>
+  </div>
+
   <!-- Datos del cliente para el recibo -->
   <div id="datosCliente" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
     <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">🧾 Datos del cliente</div>
@@ -762,6 +791,7 @@
      border-top:1px solid #eee;"></div>
   <div class="cart-actions">
     <button id="viewSummaryBtn" class="summary-btn">🧾 Resumen</button>
+    <button id="cotizacionBtn" class="summary-btn" style="background: linear-gradient(90deg, #6f42c1, #a855f7);">🖨️ Cotización</button>
     <button id="saveQuoteBtn" class="summary-btn save-quote-btn">💾 Guardar pedido</button>
     <button id="clearCartBtn" class="clear-btn">🗑️ Vaciar</button>
     <button id="checkoutBtn" class="checkout-btn">✅ Finalizar compra</button>
@@ -945,6 +975,43 @@
 
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
+
+  // 💲 Ajuste de total del carrito (descuento % o total manual)
+  // type: "none" | "percent" | "manual"
+  let cartAdjustment = { type: "none", value: 0 };
+
+  // Subtotal real (suma de precio x cantidad de todos los productos)
+  function getCartSubtotal() {
+    return cart.reduce((s, i) => s + i.qty * i.price, 0);
+  }
+
+  // Total final aplicando el descuento o el total manual, sin permitir
+  // que el descuento supere el valor de compra (el total nunca es negativo
+  // ni mayor que el subtotal real de los productos).
+  function getCartTotal() {
+    const subtotal = getCartSubtotal();
+    if (subtotal <= 0) return 0;
+
+    if (cartAdjustment.type === "percent") {
+      const pct = Math.min(Math.max(parseFloat(cartAdjustment.value) || 0, 0), 100);
+      return subtotal - (subtotal * pct / 100);
+    }
+
+    if (cartAdjustment.type === "manual") {
+      const val = Math.min(Math.max(parseFloat(cartAdjustment.value) || 0, 0), subtotal);
+      return val;
+    }
+
+    return subtotal;
+  }
+
+  function resetCartAdjustment() {
+    cartAdjustment = { type: "none", value: 0 };
+    const inputPct = document.getElementById("descuentoPorcentaje");
+    const inputManual = document.getElementById("totalManual");
+    if (inputPct) inputPct.value = "";
+    if (inputManual) inputManual.value = "";
+  }
 
   let sugerencias = {
     motos: [],
@@ -1249,6 +1316,50 @@
   cartIcon.onclick = () => cartPanel.classList.toggle("open");
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
 
+  // 💲 Aplicar descuento por porcentaje
+  document.getElementById("aplicarDescuentoBtn").onclick = () => {
+    if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+    const inputPct = document.getElementById("descuentoPorcentaje");
+    let pct = parseFloat(inputPct.value);
+    if (isNaN(pct)) return showToast("⚠️ Ingresa un porcentaje válido.");
+    if (pct < 0) pct = 0;
+    if (pct > 100) {
+      pct = 100;
+      showToast("⚠️ El descuento no puede superar el 100% del valor de compra.");
+    }
+    inputPct.value = pct;
+    document.getElementById("totalManual").value = "";
+    cartAdjustment = { type: "percent", value: pct };
+    updateCartDisplay();
+    showToast(`✅ Descuento de ${pct}% aplicado.`);
+  };
+
+  // 💲 Aplicar total editado manualmente (no puede superar el subtotal real)
+  document.getElementById("aplicarTotalManualBtn").onclick = () => {
+    if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+    const inputManual = document.getElementById("totalManual");
+    let valor = parseFloat(inputManual.value);
+    if (isNaN(valor)) return showToast("⚠️ Ingresa un valor de total válido.");
+    const subtotal = getCartSubtotal();
+    if (valor < 0) valor = 0;
+    if (valor > subtotal) {
+      valor = subtotal;
+      showToast("⚠️ El descuento no puede superar el valor de compra del producto.");
+    }
+    inputManual.value = valor;
+    document.getElementById("descuentoPorcentaje").value = "";
+    cartAdjustment = { type: "manual", value: valor };
+    updateCartDisplay();
+    showToast("✅ Total del carrito actualizado.");
+  };
+
+  // ↩️ Quitar cualquier descuento/ajuste y restaurar el total real
+  document.getElementById("quitarDescuentoBtn").onclick = () => {
+    resetCartAdjustment();
+    updateCartDisplay();
+    showToast("↩️ Descuento eliminado, total restaurado.");
+  };
+
   
 
 
@@ -1325,11 +1436,9 @@ function mostrarSugerencias(code) {
 
   function updateCartDisplay() {
     cartItemsDiv.innerHTML = "";
-    let total = 0;
     cart.forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "cart-row";
-      total += item.qty * item.price;
       row.innerHTML = `
         <span>${item.label} x${item.qty}</span>
         <span>${formatCurrency(item.price * item.qty)}</span>
@@ -1349,6 +1458,18 @@ function mostrarSugerencias(code) {
 
       cartItemsDiv.appendChild(row);
     });
+
+    // Subtotal real vs total con descuento/ajuste aplicado (nunca negativo
+    // ni mayor que el subtotal: el descuento no puede superar la compra)
+    const subtotal = getCartSubtotal();
+    const total = getCartTotal();
+    const descuentoAplicado = subtotal - total;
+    const hayAjuste = cartAdjustment.type !== "none" && descuentoAplicado > 0;
+
+    document.getElementById("cartSubtotal").textContent = formatCurrency(subtotal);
+    document.getElementById("cartDiscountAmount").textContent = "-" + formatCurrency(descuentoAplicado);
+    document.getElementById("cartSubtotalRow").style.display = hayAjuste ? "flex" : "none";
+    document.getElementById("cartDiscountRow").style.display = hayAjuste ? "flex" : "none";
     document.getElementById("cartTotal").textContent = formatCurrency(total);
     updateCartCount();
 
@@ -1618,16 +1739,40 @@ function mostrarSugerencias(code) {
     if (nombre === null) return; // canceló
 
     const quotes = getSavedQuotes();
-    const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+    const total = getCartTotal();
     quotes.push({
       id: Date.now(),
       nombre: nombre.trim() || "Sin nombre",
       fecha: new Date().toLocaleString(),
       total,
+      subtotal: getCartSubtotal(),
+      adjustment: { ...cartAdjustment },
       items: JSON.parse(JSON.stringify(cart))
     });
     setSavedQuotes(quotes);
     showToast("💾 Pedido guardado. Puedes recuperarlo en 'Pedidos guardados'.");
+  };
+
+  // 🖨️ Generar cotización imprimible del carrito, SIN registrar venta ni
+  // afectar el inventario. Sirve para clientes que solo quieren conocer precios.
+  document.getElementById("cotizacionBtn").onclick = () => {
+    if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
+
+    const clienteNombre = document.getElementById("clienteNombre").value.trim();
+    const clienteDoc = document.getElementById("clienteDoc").value.trim();
+    const clienteTel = document.getElementById("clienteTel").value.trim();
+
+    const subtotal = getCartSubtotal();
+    const total = getCartTotal();
+    const descuento = subtotal - total;
+
+    mostrarRecibo({
+      tipo: "Cotizacion",
+      fecha: new Date().toLocaleString(),
+      items: JSON.parse(JSON.stringify(cart)),
+      subtotal, descuento, total,
+      clienteNombre, clienteDoc, clienteTel
+    });
   };
 
   function abrirPedidosGuardados() {
@@ -1671,6 +1816,19 @@ function mostrarSugerencias(code) {
     }
 
     cart = JSON.parse(JSON.stringify(quote.items));
+
+    // Restaura el descuento/total manual guardado con el pedido (si tiene)
+    if (quote.adjustment && quote.adjustment.type && quote.adjustment.type !== "none") {
+      cartAdjustment = { ...quote.adjustment };
+      if (cartAdjustment.type === "percent") {
+        document.getElementById("descuentoPorcentaje").value = cartAdjustment.value;
+      } else if (cartAdjustment.type === "manual") {
+        document.getElementById("totalManual").value = cartAdjustment.value;
+      }
+    } else {
+      resetCartAdjustment();
+    }
+
     updateCartDisplay();
     document.getElementById("quotesModal").style.display = "none";
     cartPanel.classList.add("open");
@@ -1688,6 +1846,7 @@ function mostrarSugerencias(code) {
     if (cart.length === 0) return showToast("El carrito ya está vacío.");
     if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
       cart = [];
+      resetCartAdjustment();
       updateCartDisplay();
 
       // Limpia el input y fuerza a que se recalculen el texto gris y el cambio
@@ -1725,6 +1884,7 @@ function mostrarSugerencias(code) {
   function mostrarRecibo(r) {
     ultimoReciboData = r;
     const esDevolucion = r.tipo === "Devolucion";
+    const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
     const filasHtml = r.items.map(i => `
@@ -1734,12 +1894,16 @@ function mostrarSugerencias(code) {
       </tr>
     `).join("");
 
+    let titulo = NEGOCIO.nombre;
+    if (esDevolucion) titulo = "↩️ NOTA DE DEVOLUCIÓN";
+    if (esCotizacion) titulo = "🧾 COTIZACIÓN";
+
     document.getElementById("reciboPrint").innerHTML = `
-      <h3>${esDevolucion ? "↩️ NOTA DE DEVOLUCIÓN" : NEGOCIO.nombre}</h3>
-      ${esDevolucion ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
+      <h3>${titulo}</h3>
+      ${(esDevolucion || esCotizacion) ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
       <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
       <div class="recibo-linea"></div>
-      <div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>
+      ${!esCotizacion ? `<div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>` : ""}
       ${esDevolucion && r.reciboOriginal ? `<div class="recibo-dato"><strong>Devolución del recibo:</strong> #${r.reciboOriginal}</div>` : ""}
       <div class="recibo-dato"><strong>Fecha:</strong> ${r.fecha}</div>
       ${r.clienteNombre ? `<div class="recibo-dato"><strong>Cliente:</strong> ${r.clienteNombre}</div>` : ""}
@@ -1748,11 +1912,19 @@ function mostrarSugerencias(code) {
       <div class="recibo-linea"></div>
       <table>${filasHtml}</table>
       <div class="recibo-linea"></div>
-      <div class="recibo-total">${esDevolucion ? "TOTAL DEVUELTO" : "TOTAL"}: ${formatCurrency(Math.abs(r.total))}</div>
-      ${!esDevolucion ? `<div class="recibo-pago">Forma de pago: ${r.formaPago}</div>` : ""}
+      ${!esDevolucion && r.descuento > 0 ? `
+      <div class="recibo-pago">Subtotal: ${formatCurrency(r.subtotal)}</div>
+      <div class="recibo-pago">Descuento: -${formatCurrency(r.descuento)}</div>
+      ` : ""}
+      <div class="recibo-total">${esDevolucion ? "TOTAL DEVUELTO" : (esCotizacion ? "TOTAL COTIZADO" : "TOTAL")}: ${formatCurrency(Math.abs(r.total))}</div>
+      ${(!esDevolucion && !esCotizacion) ? `<div class="recibo-pago">Forma de pago: ${r.formaPago}</div>` : ""}
       ${r.pagoCon ? `<div class="recibo-pago">Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}</div>` : ""}
       <div class="recibo-linea"></div>
-      <div class="recibo-disclaimer">${esDevolucion ? "Documento interno de devolución. No constituye nota crédito electrónica ante la DIAN." : "Documento interno de venta. No constituye factura electrónica ante la DIAN."}</div>
+      <div class="recibo-disclaimer">${
+        esDevolucion ? "Documento interno de devolución. No constituye nota crédito electrónica ante la DIAN." :
+        esCotizacion ? "Documento informativo. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario. No constituye factura de venta." :
+        "Documento interno de venta. No constituye factura electrónica ante la DIAN."
+      }</div>
     `;
 
     document.getElementById("reciboModal").style.display = "flex";
@@ -1762,6 +1934,7 @@ function mostrarSugerencias(code) {
   // listo para pegar en un chat. No abre WhatsApp directamente, solo copia.
   function armarTextoWhatsapp(r) {
     const esDevolucion = r.tipo === "Devolucion";
+    const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
     const lineasProductos = r.items
@@ -1770,20 +1943,30 @@ function mostrarSugerencias(code) {
 
     let texto = esDevolucion
       ? `↩️ *NOTA DE DEVOLUCIÓN — ${NEGOCIO.nombre}*\n`
-      : `🧾 *${NEGOCIO.nombre}*\n`;
-    texto += `Recibo No: ${r.numero}\n`;
+      : esCotizacion
+        ? `🧾 *COTIZACIÓN — ${NEGOCIO.nombre}*\n`
+        : `🧾 *${NEGOCIO.nombre}*\n`;
+    if (!esCotizacion) texto += `Recibo No: ${r.numero}\n`;
     if (esDevolucion && r.reciboOriginal) texto += `Devolución del recibo: #${r.reciboOriginal}\n`;
     texto += `Fecha: ${r.fecha}\n`;
     if (r.clienteNombre) texto += `Cliente: ${r.clienteNombre}\n`;
     texto += `\n${lineasProductos}\n\n`;
+    if (!esDevolucion && r.descuento > 0) {
+      texto += `Subtotal: ${formatCurrency(r.subtotal)}\n`;
+      texto += `Descuento: -${formatCurrency(r.descuento)}\n`;
+    }
     texto += esDevolucion
       ? `*TOTAL DEVUELTO: ${formatCurrency(Math.abs(r.total))}*\n`
-      : `*TOTAL: ${formatCurrency(r.total)}*\n`;
-    if (!esDevolucion) texto += `Forma de pago: ${r.formaPago}\n`;
+      : esCotizacion
+        ? `*TOTAL COTIZADO: ${formatCurrency(r.total)}*\n`
+        : `*TOTAL: ${formatCurrency(r.total)}*\n`;
+    if (!esDevolucion && !esCotizacion) texto += `Forma de pago: ${r.formaPago}\n`;
     if (r.pagoCon) texto += `Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}\n`;
     texto += esDevolucion
       ? `\n_Documento interno de devolución, no constituye nota crédito electrónica ante la DIAN._`
-      : `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
+      : esCotizacion
+        ? `\n_Cotización informativa. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario._`
+        : `\n_Documento interno de venta, no constituye factura electrónica ante la DIAN._`;
     return texto;
   }
 
@@ -1912,7 +2095,9 @@ function mostrarSugerencias(code) {
   btn.textContent = "⏳ Procesando...";
 
   // Datos capturados para el recibo y para el registro en la hoja "Recibos"
-  const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+  const subtotal = getCartSubtotal();
+  const total = getCartTotal();
+  const descuento = subtotal - total;
   const formaPago = document.getElementById("formaPago").value;
   const pagoCon = parseFloat(document.getElementById("pagoCliente").value) || 0;
   const cambio = pagoCon > total ? pagoCon - total : 0;
@@ -1922,6 +2107,8 @@ function mostrarSugerencias(code) {
   try {
     const data = {
       entorno: ENTORNO,
+      subtotal,
+      descuento,
       total,
       formaPago,
       pagoCon,
@@ -1964,12 +2151,13 @@ function mostrarSugerencias(code) {
       numero: numeroRecibo,
       fecha: new Date().toLocaleString(),
       items: JSON.parse(JSON.stringify(cart)),
-      total,
+      subtotal, descuento, total,
       clienteNombre, clienteDoc, clienteTel,
       formaPago, pagoCon, cambio
     });
 
     cart = [];
+    resetCartAdjustment();
     updateCartDisplay();
 
     // Limpia los campos y actualiza los textos visuales tras la compra
@@ -2132,11 +2320,16 @@ function parseFechaSheet(val) {
   document.getElementById("viewSummaryBtn").onclick = () => {
     const table = document.getElementById("summaryTable");
     table.innerHTML = "<tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr>";
-    let total = 0;
     cart.forEach(i => {
-      total += i.qty * i.price;
       table.innerHTML += `<tr><td>${i.label}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
     });
+    const subtotal = getCartSubtotal();
+    const total = getCartTotal();
+    const descuento = subtotal - total;
+    if (descuento > 0) {
+      table.innerHTML += `<tr><th colspan=2>Subtotal</th><th>${formatCurrency(subtotal)}</th></tr>`;
+      table.innerHTML += `<tr><th colspan=2>Descuento</th><th>-${formatCurrency(descuento)}</th></tr>`;
+    }
     table.innerHTML += `<tr><th colspan=2>Total</th><th>${formatCurrency(total)}</th></tr>`;
     document.getElementById("summaryModal").style.display = "flex";
   };
@@ -2146,7 +2339,14 @@ function parseFechaSheet(val) {
   document.getElementById("copySummaryBtn").onclick = () => {
     let text = "🧾 Resumen del pedido:\n";
     cart.forEach(i => text += `- ${i.label} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
-    text += `TOTAL: ${formatCurrency(cart.reduce((s,i) => s + i.qty * i.price, 0))}`;
+    const subtotal = getCartSubtotal();
+    const total = getCartTotal();
+    const descuento = subtotal - total;
+    if (descuento > 0) {
+      text += `Subtotal: ${formatCurrency(subtotal)}\n`;
+      text += `Descuento: -${formatCurrency(descuento)}\n`;
+    }
+    text += `TOTAL: ${formatCurrency(total)}`;
     navigator.clipboard.writeText(text);
     showToast("✅ Resumen copiado al portapapeles");
   };

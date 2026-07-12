@@ -140,7 +140,7 @@
   #reciboModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 3000; }
   #reciboModalContent { background: #fff; border-radius: 10px; padding: 18px; width: 92%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
   #reciboPrint { font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #222; }
-  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 20px; }
+  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 16px; }
   #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #555; line-height: 1.4; }
   #reciboPrint .recibo-linea { border-top: 1px dashed #999; margin: 8px 0; }
   #reciboPrint .recibo-dato { font-size: 12px; margin: 2px 0; }
@@ -1002,7 +1002,7 @@
   const NEGOCIO = {
     nombre: "Moto Ya!",
     nit: "C.C./NIT: 1.121.883.884-2",
-    direccion: "Cra 21 #14-89 — Acacias",
+    direccion: "Cra 21 #14-89 — Acacias al lado del Interrapidisimo",
     telefono: "Tel: 314 258 9098",
     // 👉 Número de WhatsApp para el QR del recibo/cotización, en formato
     // internacional SIN espacios, signos ni el "+" (código de país + número).
@@ -1953,11 +1953,11 @@ function mostrarSugerencias(code) {
 
     let titulo = NEGOCIO.nombre;
     if (esDevolucion) titulo = "↩️ NOTA DE DEVOLUCIÓN";
-    if (esCotizacion) titulo = "🧾 COTIZACIÓN";
 
     document.getElementById("reciboPrint").innerHTML = `
       <h3>${titulo}</h3>
-      ${(esDevolucion || esCotizacion) ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
+      ${esDevolucion ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
+      ${esCotizacion ? `<div class="recibo-sub"><strong>🧾 COTIZACIÓN</strong></div>` : ""}
       <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
       <div class="recibo-linea"></div>
       ${!esCotizacion ? `<div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>` : ""}

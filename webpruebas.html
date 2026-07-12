@@ -140,7 +140,7 @@
   #reciboModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 3000; }
   #reciboModalContent { background: #fff; border-radius: 10px; padding: 18px; width: 92%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
   #reciboPrint { font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #222; }
-  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 16px; }
+  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 20px; }
   #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #555; line-height: 1.4; }
   #reciboPrint .recibo-linea { border-top: 1px dashed #999; margin: 8px 0; }
   #reciboPrint .recibo-dato { font-size: 12px; margin: 2px 0; }
@@ -162,7 +162,16 @@
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
        Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
        y el "width: 76mm" de #reciboModalContent por "width: 54mm". */
-    @page { size: 80mm auto; margin: 0; }
+    /* 📏 Usamos un largo FIJO muy grande (3 metros) en vez de "auto".
+       Muchos drivers de impresoras térmicas en Windows no soportan bien
+       "auto" (largo continuo real) y en su lugar usan un largo por
+       defecto tipo carta/A4; al llegar el recibo a ese límite, lo cortan
+       y siguen imprimiendo en una "página" nueva. Con un largo fijo bien
+       grande, el recibo real (que siempre mide menos) nunca lo alcanza,
+       así que la impresora corta el papel justo donde termina el
+       contenido, de corrido, sin dividirlo.
+       Si tu impresora usa rollos de 58mm, cambia también el "80mm". */
+    @page { size: 80mm 3000mm; margin: 0; }
     html, body { margin: 0; padding: 0; height: auto !important; }
 
     /* Se saca TODO del flujo con display:none (no solo visibility:hidden).
@@ -172,6 +181,18 @@
     body * { display: none !important; }
     #reciboModal, #reciboModal *,
     #reciboPrint, #reciboPrint * { display: revert !important; }
+
+    /* 🚫 Evita que el navegador parta un renglón, una fila de la tabla o
+       un bloque (total, QR, disclaimer) justo en la mitad si llegara a
+       calcular un salto de página. */
+    #reciboPrint, #reciboPrint * {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    #reciboModalContent {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
 
     #reciboModal {
       position: static !important;
@@ -754,12 +775,13 @@
       <button id="aplicarDescuentoBtn" style="padding: 4px 8px; border: none; border-radius: 6px; background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; cursor: pointer; font-size: 12px;">Aplicar</button>
     </div>
 
-    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 2px;">
       <label for="totalManual" style="font-size: 12px; color: #555; flex: 1;">Total manual</label>
       <input id="totalManual" type="number" min="0" step="any" placeholder="$"
         style="width: 90px; padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc; text-align: right; box-sizing: border-box;">
       <button id="aplicarTotalManualBtn" style="padding: 4px 8px; border: none; border-radius: 6px; background: linear-gradient(90deg, #00b09b, #96c93d); color: #fff; cursor: pointer; font-size: 12px;">Aplicar</button>
     </div>
+    <div id="totalManualFormateado" style="text-align: right; font-size: 11px; color: #888; margin-bottom: 6px;">$0</div>
 
     <button id="quitarDescuentoBtn" style="width: 100%; padding: 5px 6px; border: none; border-radius: 6px; background: #eee; color: #555; cursor: pointer; font-size: 12px;">↩️ Quitar descuento / restaurar total</button>
   </div>
@@ -1028,6 +1050,17 @@
     const inputManual = document.getElementById("totalManual");
     if (inputPct) inputPct.value = "";
     if (inputManual) inputManual.value = "";
+    actualizarTotalManualFormateado();
+  }
+
+  // 💲 Muestra en vivo, con separador de miles, lo que el usuario va
+  // escribiendo en "Total manual" (ej: escribe 50000 y ve "$50.000").
+  function actualizarTotalManualFormateado() {
+    const inputManual = document.getElementById("totalManual");
+    const preview = document.getElementById("totalManualFormateado");
+    if (!inputManual || !preview) return;
+    const valor = parseFloat(inputManual.value) || 0;
+    preview.textContent = formatCurrency(valor);
   }
 
   let sugerencias = {
@@ -1333,6 +1366,10 @@
   cartIcon.onclick = () => cartPanel.classList.toggle("open");
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
 
+  // 💲 Vista previa en vivo (con separador de miles) mientras se escribe
+  // el total manual, ej: escribe 50000 y debajo ve "$50.000".
+  document.getElementById("totalManual").addEventListener("input", actualizarTotalManualFormateado);
+
   // 💲 Aplicar descuento por porcentaje
   document.getElementById("aplicarDescuentoBtn").onclick = () => {
     if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
@@ -1346,6 +1383,7 @@
     }
     inputPct.value = pct;
     document.getElementById("totalManual").value = "";
+    actualizarTotalManualFormateado();
     cartAdjustment = { type: "percent", value: pct };
     updateCartDisplay();
     showToast(`✅ Descuento de ${pct}% aplicado.`);
@@ -1364,6 +1402,7 @@
       showToast("⚠️ El descuento no puede superar el valor de compra del producto.");
     }
     inputManual.value = valor;
+    actualizarTotalManualFormateado();
     document.getElementById("descuentoPorcentaje").value = "";
     cartAdjustment = { type: "manual", value: valor };
     updateCartDisplay();
@@ -1841,6 +1880,7 @@ function mostrarSugerencias(code) {
         document.getElementById("descuentoPorcentaje").value = cartAdjustment.value;
       } else if (cartAdjustment.type === "manual") {
         document.getElementById("totalManual").value = cartAdjustment.value;
+        actualizarTotalManualFormateado();
       }
     } else {
       resetCartAdjustment();

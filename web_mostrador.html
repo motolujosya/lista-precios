@@ -43,10 +43,11 @@
   .stock-low { color: #ff9800; font-weight: bold; font-size: 13px; }
   .stock-out { color: #dc3545; font-weight: bold; font-size: 13px; }
 
-  .add-btn { background: linear-gradient(90deg, #00b09b, #96c93d); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; transition: transform 0.2s; }
-  .add-btn:hover { transform: scale(1.05); }
-  .add-btn:disabled { background: #ccc; cursor: not-allowed; }
-  .copy-btn { background: linear-gradient(90deg, #007bff, #00c6ff); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .add-btn { background: #ffffff; color: #009e87; border: 1.5px solid #00b09b; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: transform 0.2s, background 0.2s; }
+  .add-btn:hover { background: #eafaf7; transform: scale(1.05); }
+  .add-btn:disabled { background: #f0f0f0; color: #999; border-color: #ccc; cursor: not-allowed; }
+  .copy-btn { background: #ffffff; color: #007bff; border: 1.5px solid #007bff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+  .copy-btn:hover { background: #eaf4ff; }
 
   /* Botones flotantes (carrito, chat) — misma estética sobria */
   .float-actions {
@@ -975,6 +976,7 @@
       <div id="clienteSugerencias" class="cliente-sugerencias"></div>
     </div>
     <select id="formaPago" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
+      <option value="" selected>-- Selecciona forma de pago --</option>
       <option value="Efectivo">💵 Efectivo</option>
       <option value="Transferencia">🏦 Transferencia</option>
       <option value="Tarjeta">💳 Tarjeta</option>
@@ -2372,6 +2374,14 @@ function mostrarSugerencias(code) {
     return;
   }
 
+  // 💳 La forma de pago es obligatoria: sin ella no se puede generar la venta
+  const formaPagoInput = document.getElementById("formaPago");
+  if (!formaPagoInput.value) {
+    showToast("⚠️ Selecciona una forma de pago para poder finalizar la venta.");
+    formaPagoInput.focus();
+    return;
+  }
+
   if (!confirm(`¿Confirmar compra de ${cart.reduce((s,i)=>s+i.qty,0)} productos?`)) return;
 
   const btn = document.getElementById("checkoutBtn");
@@ -2450,7 +2460,7 @@ function mostrarSugerencias(code) {
     document.getElementById("clienteTel").value = "";
     document.getElementById("clienteSugerencias").classList.remove("visible");
     clientesCacheTime = 0; // fuerza a releer "Clientes" en la próxima búsqueda (por si se guardó/actualizó uno nuevo)
-    document.getElementById("formaPago").value = "Efectivo";
+    document.getElementById("formaPago").value = "";
     const inputPago = document.getElementById("pagoCliente");
     inputPago.value = "";
     if (typeof inputPago.oninput === "function") inputPago.oninput();

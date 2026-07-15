@@ -2063,6 +2063,20 @@ function mostrarSugerencias(code) {
 
     cart = JSON.parse(JSON.stringify(quote.items));
 
+    // 💲 Actualiza cada producto al precio VIGENTE del catálogo (buscando
+    // por código), en vez de dejar el precio "congelado" de cuando se
+    // guardó el pedido. Si el producto ya no existe o no tiene código,
+    // se conserva el precio que traía guardado, como respaldo.
+    let preciosActualizados = 0;
+    cart.forEach(item => {
+      if (!item.code) return;
+      const actual = productosData.find(p => p.code === item.code);
+      if (actual && actual.price !== item.price) {
+        item.price = actual.price;
+        preciosActualizados++;
+      }
+    });
+
     // Restaura el descuento/total manual guardado con el pedido (si tiene)
     if (quote.adjustment && quote.adjustment.type && quote.adjustment.type !== "none") {
       cartAdjustment = { ...quote.adjustment };
@@ -2079,7 +2093,9 @@ function mostrarSugerencias(code) {
     updateCartDisplay();
     document.getElementById("quotesModal").style.display = "none";
     cartPanel.classList.add("open");
-    showToast(`📥 Pedido "${quote.nombre}" cargado en el carrito.`);
+    showToast(preciosActualizados > 0
+      ? `📥 Pedido "${quote.nombre}" cargado. Se actualizaron ${preciosActualizados} precio(s) al valor vigente.`
+      : `📥 Pedido "${quote.nombre}" cargado en el carrito.`);
   }
 
   function eliminarPedidoGuardado(id) {

@@ -349,15 +349,15 @@
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
        Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
        y el "width: 76mm" de #reciboModalContent por "width: 54mm". */
-    /* 📏 Usamos un largo FIJO muy grande (3 metros) en vez de "auto".
-       Muchos drivers de impresoras térmicas en Windows no soportan bien
-       "auto" (largo continuo real) y en su lugar usan un largo por
-       defecto tipo carta/A4; al llegar el recibo a ese límite, lo cortan
-       y siguen imprimiendo en una "página" nueva. Con un largo fijo bien
-       grande, el recibo real (que siempre mide menos) nunca lo alcanza,
-       así que la impresora corta el papel justo donde termina el
-       contenido, de corrido, sin dividirlo.
-       Si tu impresora usa rollos de 58mm, cambia también el "80mm". */
+    /* 📏 Este @page de 3000mm es solo un RESPALDO por si algo falla con
+       JavaScript. El tamaño real que se usa lo calcula la función
+       imprimirRecibo() (ver <script>), que mide el alto exacto del recibo
+       ya renderizado y genera un @page a la medida justo antes de imprimir,
+       agregando una hoja <style id="reciboPageSizeAjuste"> que, al ir
+       después en el documento, sobrescribe este valor por defecto.
+       Si tu impresora usa rollos de 58mm, cambia también el "80mm" (aquí,
+       en el "width: 76mm" de #reciboModalContent más abajo, y en la
+       constante anchoMM dentro de imprimirRecibo()). */
     @page { size: 80mm 3000mm; margin: 0; }
     html, body { margin: 0; padding: 0; height: auto !important; }
 
@@ -1035,7 +1035,7 @@
   <div id="reciboModalContent">
     <div id="reciboPrint"></div>
     <div class="recibo-modal-actions">
-      <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+      <button onclick="imprimirRecibo()">🖨️ Imprimir / Guardar PDF</button>
       <button class="btn-copiar-whatsapp" onclick="copiarReciboWhatsapp()">📋 Copiar p/ WhatsApp</button>
       <button onclick="document.getElementById('reciboModal').style.display='none'">Cerrar</button>
     </div>
@@ -2143,6 +2143,30 @@ function mostrarSugerencias(code) {
   }
 
   let ultimoReciboData = null;
+
+  // 🖨️ Imprime ajustando el largo de la hoja al contenido real del recibo.
+  // Antes se usaba un largo fijo enorme (3000mm) para evitar que drivers de
+  // impresoras térmicas cortaran el recibo a la mitad, pero eso hacía que al
+  // imprimir a una impresora normal o guardar como PDF saliera una hoja
+  // gigante casi en blanco. Aquí medimos el alto real en píxeles del recibo
+  // ya renderizado, lo convertimos a milímetros y generamos un @page a la
+  // medida justo antes de llamar a window.print().
+  function imprimirRecibo() {
+    const contenido = document.getElementById("reciboModalContent");
+    const anchoMM = 80; // Cambia a 58 si tu rollo/impresora es de 58mm
+    const pxPorMM = 96 / 25.4; // 96 DPI estándar de pantalla
+    const altoMM = Math.ceil(contenido.scrollHeight / pxPorMM) + 6; // +6mm de margen de seguridad
+
+    let styleAjuste = document.getElementById("reciboPageSizeAjuste");
+    if (!styleAjuste) {
+      styleAjuste = document.createElement("style");
+      styleAjuste.id = "reciboPageSizeAjuste";
+      document.head.appendChild(styleAjuste);
+    }
+    styleAjuste.innerHTML = `@media print { @page { size: ${anchoMM}mm ${altoMM}mm; margin: 0; } }`;
+
+    window.print();
+  }
 
   function mostrarRecibo(r) {
     ultimoReciboData = r;

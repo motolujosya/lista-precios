@@ -212,21 +212,33 @@
   }
 
   .icon-btn--primary {
-    background: #2c3e50;
-    color: #fff;
-    border-color: #2c3e50;
+    background: #fff;
+    color: #444;
+    border-color: #ddd;
   }
 
   .icon-btn--primary:hover {
-    background: #3d5166;
-    border-color: #3d5166;
-    color: #fff;
+    background: #f8f9fa;
+    border-color: #bbb;
+    color: #444;
   }
 
   .icon-btn--destructive:hover {
     background: #fff5f5;
     border-color: #f5c6cb;
     color: #dc3545;
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .icon-btn--primary:disabled {
+    background: #fff;
+    border-color: #ddd;
+    color: #444;
   }
 
   .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box; }
@@ -382,18 +394,26 @@
     }
 
     #reciboModal {
+      display: block !important;
       position: static !important;
       background: none !important;
       width: auto !important;
       height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
     #reciboModalContent {
       box-shadow: none !important;
       max-height: none !important;
       overflow: visible !important;
       width: 76mm;
+      margin: 0 !important;
       padding: 0mm 2mm 6mm 2mm;
     }
+    #reciboPrint {
+      margin: 0 !important;
+    }
+    #reciboPrint h3:first-child { margin-top: 0 !important; }
     /* 🖤 Forzamos negro puro (nada de grises) y más peso de fuente.
        En térmica los grises se "ditherean" (se simulan con puntos) y eso
        es lo que se ve borroso/difuminado; el negro sólido imprime nítido. */
@@ -1015,7 +1035,7 @@
       <span class="cart-action-label">Vaciar</span>
     </div>
     <div class="cart-action-item">
-      <button id="checkoutBtn" class="icon-btn icon-btn--primary" data-tooltip="Finalizar compra" aria-label="Finalizar compra">✅</button>
+      <button id="checkoutBtn" class="icon-btn" data-tooltip="Finalizar compra" aria-label="Finalizar compra">✅</button>
       <span class="cart-action-label">Finalizar</span>
     </div>
   </div>
@@ -2149,23 +2169,38 @@ function mostrarSugerencias(code) {
   // impresoras térmicas cortaran el recibo a la mitad, pero eso hacía que al
   // imprimir a una impresora normal o guardar como PDF saliera una hoja
   // gigante casi en blanco. Aquí medimos el alto real en píxeles del recibo
-  // ya renderizado, lo convertimos a milímetros y generamos un @page a la
-  // medida justo antes de llamar a window.print().
+  // ya renderizado (incluyendo el QR), lo convertimos a milímetros y
+  // generamos un @page a la medida justo antes de llamar a window.print().
+  // Este es el ÚNICO flujo de impresión de la app: se usa igual para venta,
+  // cotización, devolución y reimpresión desde el historial, así que el
+  // ajuste aplica automáticamente a todos los casos.
   function imprimirRecibo() {
-    const contenido = document.getElementById("reciboModalContent");
+    // Medimos #reciboPrint (el recibo en sí), NO #reciboModalContent, porque
+    // ese contenedor también incluye los botones de "Imprimir/Copiar/Cerrar"
+    // (solo se ocultan al imprimir, pero en pantalla normal sí suman alto),
+    // lo que inflaba el cálculo y dejaba espacio de sobra.
+    const recibo = document.getElementById("reciboPrint");
     const anchoMM = 80; // Cambia a 58 si tu rollo/impresora es de 58mm
     const pxPorMM = 96 / 25.4; // 96 DPI estándar de pantalla
-    const altoMM = Math.ceil(contenido.scrollHeight / pxPorMM) + 6; // +6mm de margen de seguridad
 
-    let styleAjuste = document.getElementById("reciboPageSizeAjuste");
-    if (!styleAjuste) {
-      styleAjuste = document.createElement("style");
-      styleAjuste.id = "reciboPageSizeAjuste";
-      document.head.appendChild(styleAjuste);
-    }
-    styleAjuste.innerHTML = `@media print { @page { size: ${anchoMM}mm ${altoMM}mm; margin: 0; } }`;
+    // Esperamos dos frames de animación: el QR (canvas -> toDataURL -> img)
+    // y el resto del layout ya quedan pintados y con su tamaño final antes
+    // de medir, así el alto calculado siempre coincide con lo que se ve.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const altoMM = Math.ceil(recibo.getBoundingClientRect().height / pxPorMM) + 3; // pequeño margen de seguridad
 
-    window.print();
+        let styleAjuste = document.getElementById("reciboPageSizeAjuste");
+        if (!styleAjuste) {
+          styleAjuste = document.createElement("style");
+          styleAjuste.id = "reciboPageSizeAjuste";
+          document.head.appendChild(styleAjuste);
+        }
+        styleAjuste.innerHTML = `@media print { @page { size: ${anchoMM}mm ${altoMM}mm; margin: 0 !important; } }`;
+
+        window.print();
+      });
+    });
   }
 
   function mostrarRecibo(r) {
@@ -2426,7 +2461,8 @@ function mostrarSugerencias(code) {
 
   const btn = document.getElementById("checkoutBtn");
   btn.disabled = true;
-  btn.textContent = "⏳ Procesando...";
+  btn.textContent = "⏳";
+  btn.setAttribute("data-tooltip", "Procesando...");
 
   // Datos capturados para el recibo y para el registro en la hoja "Recibos"
   const subtotal = getCartSubtotal();
@@ -2519,7 +2555,8 @@ function mostrarSugerencias(code) {
   }
 
   btn.disabled = false;
-  btn.textContent = "✅ Finalizar compra";
+  btn.textContent = "✅";
+  btn.setAttribute("data-tooltip", "Finalizar compra");
 };
 
 function parseFechaSheet(val) {

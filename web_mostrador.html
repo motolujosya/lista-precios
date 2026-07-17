@@ -338,19 +338,38 @@
   /* Modal recibo */
   #reciboModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 3000; }
   #reciboModalContent { background: #fff; border-radius: 10px; padding: 18px; width: 92%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
-  #reciboPrint { font-family: 'Courier New', Courier, monospace; font-size: 13px; color: #222; }
-  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 16px; }
-  #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #555; line-height: 1.4; }
-  #reciboPrint .recibo-linea { border-top: 1px dashed #999; margin: 8px 0; }
+  /* 📏 El recibo se muestra en pantalla con el MISMO ancho físico (76mm)
+     y la MISMA tipografía que se usará al imprimir. Esto es clave: si en
+     pantalla se viera más ancho, el texto envolvería en menos líneas de
+     lo que realmente ocupa al imprimir a 76mm, y el cálculo del alto de
+     la hoja (más abajo, en JS) saldría corto — que es justo lo que pasaba
+     antes y partía el recibo en varias páginas. */
+  #reciboPrint {
+    font-family: 'Courier New', Courier, monospace;
+    width: 76mm;
+    margin: 0 auto;
+    box-sizing: border-box;
+    color: #000;
+    font-weight: 600;
+    -webkit-font-smoothing: none;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  #reciboPrint h3 { text-align: center; margin: 0 0 4px 0; font-size: 20px; font-weight: 700; }
+  #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #333; line-height: 1.4; }
+  #reciboPrint .recibo-linea { border-top: 1.5px dashed #000; margin: 8px 0; }
   #reciboPrint .recibo-dato { font-size: 12px; margin: 2px 0; }
-  #reciboPrint table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #reciboPrint table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
   #reciboPrint td { padding: 2px 0; vertical-align: top; }
+  #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
+  #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
   #reciboPrint .recibo-total { font-size: 15px; font-weight: bold; text-align: right; margin-top: 6px; }
-  #reciboPrint .recibo-pago { text-align: right; font-size: 12px; color: #333; }
-  #reciboPrint .recibo-disclaimer { text-align: center; font-size: 10px; color: #888; margin-top: 10px; }
+  #reciboPrint .recibo-pago { text-align: right; font-size: 12px; color: #222; }
+  #reciboPrint .recibo-disclaimer { text-align: center; font-size: 10px; color: #444; margin-top: 10px; }
   #reciboPrint .recibo-qr { text-align: center; margin-top: 12px; }
-  #reciboPrint .recibo-qr img, #reciboPrint .recibo-qr canvas { display: inline-block; }
-  #reciboPrint .recibo-qr-label { font-size: 10px; color: #555; margin-top: 4px; }
+  #reciboPrint .recibo-qr img { display: inline-block; width: 100px; height: 100px; }
+  #reciboPrint .recibo-qr canvas { display: none; } /* la librería genera canvas oculto + img visible; el canvas no se necesita nunca */
+  #reciboPrint .recibo-qr-label { font-size: 10px; color: #333; margin-top: 4px; }
   .recibo-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .recibo-modal-actions button { flex: 1; min-width: 100px; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
   .recibo-modal-actions button:first-child { background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; }
@@ -360,18 +379,21 @@
   @media print {
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
        Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
-       y el "width: 76mm" de #reciboModalContent por "width: 54mm". */
-    /* 📏 "size: 80mm auto" es la clave: el ancho queda fijo (80mm, el
-       ancho real del rollo térmico) pero el ALTO lo calcula el propio
-       navegador según el contenido ya renderizado con estos mismos
-       estilos de impresión — sin necesidad de que JavaScript lo adivine
-       desde el tamaño en pantalla (eso fallaba porque en pantalla el
-       texto es más chico/delgado que al imprimir, y el cálculo se
-       quedaba corto, partiendo el recibo en una segunda página casi
-       vacía con el QR solo). Con "auto" el recibo siempre sale en una
-       sola página, del largo exacto que necesite, sin importar cuántos
-       productos tenga. */
-    @page { size: 80mm auto; margin: 0; }
+       y el "width: 76mm" de #reciboPrint más arriba por "width: 54mm". */
+    /* 📏 Este @page de 3000mm es solo un RESPALDO por si algo falla con
+       JavaScript (por ejemplo si el usuario imprime sin pasar por el
+       botón). El valor real lo calcula imprimirRecibo() (ver el bloque
+       de JavaScript más abajo)
+       y lo inyecta en <style id="reciboPageSizeAjuste">, que al ir
+       después en el documento sobrescribe este valor por defecto.
+       Antes probamos "size: 80mm auto" para que el navegador calculara
+       el alto solo, pero varios navegadores/drivers de impresora NO
+       soportan bien "auto" y usan un alto fijo tipo A4 (297mm), cortando
+       el recibo en varias hojas — por eso volvimos a calcular el alto
+       exacto con JavaScript. Ahora es preciso porque el recibo se ve en
+       pantalla con el MISMO ancho y tipografía que al imprimir (ver
+       reglas de #reciboPrint más arriba), así que ya no hay desfase. */
+    @page { size: 80mm 3000mm; margin: 0; }
     html, body { margin: 0; padding: 0; height: auto !important; }
 
     /* Se saca TODO del flujo con display:none (no solo visibility:hidden).
@@ -407,43 +429,22 @@
       box-shadow: none !important;
       max-height: none !important;
       overflow: visible !important;
-      width: 76mm;
+      width: auto !important;
       margin: 0 !important;
-      padding: 0mm 2mm 6mm 2mm;
+      padding: 0 0 6mm 0 !important;
     }
-    #reciboPrint {
-      margin: 0 !important;
-    }
+    #reciboPrint { margin: 0 auto !important; }
     #reciboPrint h3:first-child { margin-top: 0 !important; }
-    /* 🖤 Forzamos negro puro (nada de grises) y más peso de fuente.
-       En térmica los grises se "ditherean" (se simulan con puntos) y eso
-       es lo que se ve borroso/difuminado; el negro sólido imprime nítido. */
-    #reciboPrint, #reciboPrint * {
-      color: #000 !important;
-      font-weight: 600 !important;
-      -webkit-font-smoothing: none !important;
-    }
-    #reciboPrint {
-      font-size: 13px;
-      line-height: 1.4;
-    }
-    #reciboPrint h3 { font-size: 20px; font-weight: 700 !important; }
-    #reciboPrint .recibo-linea { border-top: 1.5px dashed #000 !important; }
-    #reciboPrint table { table-layout: fixed; width: 100%; }
-    #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
-    #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
-    #reciboPrint .recibo-total { font-size: 15px; }
-    #reciboPrint .recibo-qr img, #reciboPrint .recibo-qr canvas {
-      width: 100px !important;
-      height: 100px !important;
-    }
-    /* La librería del QR genera un <canvas> (oculto) y un <img> (visible).
-       El "display: revert" de arriba reactiva ese canvas oculto y aparecen
-       dos QR pegados; aquí lo volvemos a ocultar solo en impresión. */
+
+    /* La librería del QR genera un <canvas> oculto + un <img> visible.
+       El "display: revert" de arriba reactiva ese canvas oculto y
+       aparecen dos QR pegados; aquí lo volvemos a ocultar solo en
+       impresión (en pantalla ya está oculto por la regla base). */
     #reciboPrint .recibo-qr canvas { display: none !important; }
     .recibo-modal-actions,
     #reciboModal .recibo-modal-actions { display: none !important; }
   }
+
 
   /* Modal Buscar Recibos */
   #buscarRecibosModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
@@ -2168,23 +2169,43 @@ function mostrarSugerencias(code) {
   // 🖨️ Imprime el recibo (venta, cotización, devolución o reimpresión: todas
   // pasan por esta misma función, es el único flujo de impresión de la app).
   //
-  // Antes calculábamos el alto de la hoja con JavaScript, midiendo el recibo
-  // TAL COMO SE VE EN PANTALLA (dentro del modal) y convirtiéndolo a
-  // milímetros. El problema: al imprimir se aplican estilos distintos
-  // (letra más grande, más gruesa —ver reglas @media print más abajo—),
-  // así que el recibo impreso queda MÁS ALTO que lo medido en pantalla.
-  // Ese desfase hacía que el cálculo se quedara corto y el ticket se
-  // partiera en una segunda "página" casi vacía (por ejemplo, dejando el
-  // código QR solo, separado del resto).
+  // Historial de intentos anteriores, por si se vuelve a tocar esto:
+  // 1) @page fijo de 3000mm: dejaba hojas enormes casi en blanco.
+  // 2) Calcular el alto con JS midiendo el recibo EN PANTALLA: fallaba
+  //    porque en pantalla el recibo se veía más ancho y con letra más
+  //    delgada que al imprimir, así que el texto envolvía en MENOS líneas
+  //    de las que ocupaba realmente al imprimir a 76mm — el cálculo salía
+  //    corto y el recibo se partía en varias páginas (el QR quedaba solo).
+  // 3) "size: 80mm auto": el navegador debía calcular el alto exacto solo,
+  //    pero varios navegadores/impresoras NO lo soportan y usan un alto
+  //    fijo tipo A4 (297mm), cortando igual el recibo en varias hojas.
   //
-  // La solución robusta es "size: 80mm auto" en el @page (ver CSS de
-  // @media print): el ancho queda fijo en 80mm, pero el alto lo calcula
-  // el propio motor de impresión del navegador usando el layout YA
-  // renderizado con los estilos de impresión reales (incluido el QR), sin
-  // adivinar nada desde JavaScript. Por eso ya no hace falta medir nada
-  // aquí: basta con llamar a window.print().
+  // Solución actual: el recibo se ve en pantalla con el MISMO ancho
+  // (76mm) y la MISMA tipografía que al imprimir (ver reglas de
+  // #reciboPrint en el CSS), así que ahora si medimos su alto en pantalla
+  // coincide exactamente con lo que ocupará al imprimir. Solo esperamos
+  // un par de frames para asegurarnos de que el QR ya terminó de pintarse
+  // antes de medir.
   function imprimirRecibo() {
-    window.print();
+    const recibo = document.getElementById("reciboPrint");
+    const anchoMM = 80; // Cambia a 58 si tu rollo/impresora es de 58mm
+    const pxPorMM = 96 / 25.4; // 96 DPI estándar de pantalla
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const altoMM = Math.ceil(recibo.getBoundingClientRect().height / pxPorMM) + 4; // pequeño margen de seguridad
+
+        let styleAjuste = document.getElementById("reciboPageSizeAjuste");
+        if (!styleAjuste) {
+          styleAjuste = document.createElement("style");
+          styleAjuste.id = "reciboPageSizeAjuste";
+          document.head.appendChild(styleAjuste);
+        }
+        styleAjuste.innerHTML = `@media print { @page { size: ${anchoMM}mm ${altoMM}mm; margin: 0 !important; } }`;
+
+        window.print();
+      });
+    });
   }
 
   function mostrarRecibo(r) {

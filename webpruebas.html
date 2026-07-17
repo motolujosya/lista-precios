@@ -338,16 +338,30 @@
   /* Modal recibo */
   #reciboModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 3000; }
   #reciboModalContent { background: #fff; border-radius: 10px; padding: 18px; width: 92%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
-  /* 📏 El recibo se muestra en pantalla con el MISMO ancho físico (76mm)
+  /* 📏 El recibo se muestra en pantalla con el MISMO ancho físico (68mm)
      y la MISMA tipografía que se usará al imprimir. Esto es clave: si en
      pantalla se viera más ancho, el texto envolvería en menos líneas de
-     lo que realmente ocupa al imprimir a 76mm, y el cálculo del alto de
-     la hoja (más abajo, en JS) saldría corto — que es justo lo que pasaba
-     antes y partía el recibo en varias páginas. */
+     lo que realmente ocupa al imprimir, y el cálculo del alto de la hoja
+     (más abajo, en JS) saldría corto — que es justo lo que pasaba antes
+     y partía el recibo en varias páginas.
+     ¿Por qué 68mm y no 72 u 80? Muchas impresoras térmicas de "80mm"
+     tienen en realidad un área imprimible real más angosta (el cabezal
+     físico no llega hasta el borde del rollo) — Chrome reportó "72.1mm"
+     para esta impresora, pero incluso con 72mm el precio (que va pegado
+     al borde derecho, alineado a la derecha) se seguía cortando al
+     imprimir en físico: el margen "seguro" real resultó ser más angosto
+     de lo que Chrome calcula, o el área imprimible no está perfectamente
+     centrada en el rollo. Por eso ahora usamos 68mm DE ANCHO más 2mm de
+     "padding" interno a cada lado (ver abajo): eso deja el texto más
+     alejado del borde físico, con más margen de tolerancia. Si tu
+     impresora corta muy poco (por ejemplo, un dígito del precio), puedes
+     achicar aún más este número; si nunca se corta nada, puedes probar a
+     subirlo un poco (por ejemplo a 70mm) para aprovechar más el papel. */
   #reciboPrint {
     font-family: 'Courier New', Courier, monospace;
-    width: 76mm;
+    width: 68mm;
     margin: 0 auto;
+    padding: 0 2mm;
     box-sizing: border-box;
     color: #000;
     font-weight: 600;
@@ -379,7 +393,8 @@
   @media print {
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
        Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
-       y el "width: 76mm" de #reciboPrint más arriba por "width: 54mm". */
+       y el "width: 68mm" de #reciboPrint más arriba por "width: 44mm"
+       (el área imprimible real de un rollo de 58mm suele rondar 44mm). */
     /* 📏 Este @page de 3000mm es solo un RESPALDO por si algo falla con
        JavaScript (por ejemplo si el usuario imprime sin pasar por el
        botón). El valor real lo calcula imprimirRecibo() (ver el bloque
@@ -2174,14 +2189,14 @@ function mostrarSugerencias(code) {
   // 2) Calcular el alto con JS midiendo el recibo EN PANTALLA: fallaba
   //    porque en pantalla el recibo se veía más ancho y con letra más
   //    delgada que al imprimir, así que el texto envolvía en MENOS líneas
-  //    de las que ocupaba realmente al imprimir a 76mm — el cálculo salía
+  //    de las que ocupaba realmente al imprimir a 68mm — el cálculo salía
   //    corto y el recibo se partía en varias páginas (el QR quedaba solo).
   // 3) "size: 80mm auto": el navegador debía calcular el alto exacto solo,
   //    pero varios navegadores/impresoras NO lo soportan y usan un alto
   //    fijo tipo A4 (297mm), cortando igual el recibo en varias hojas.
   //
   // Solución actual: el recibo se ve en pantalla con el MISMO ancho
-  // (76mm) y la MISMA tipografía que al imprimir (ver reglas de
+  // (68mm) y la MISMA tipografía que al imprimir (ver reglas de
   // #reciboPrint en el CSS), así que ahora si medimos su alto en pantalla
   // coincide exactamente con lo que ocupará al imprimir. Solo esperamos
   // un par de frames para asegurarnos de que el QR ya terminó de pintarse

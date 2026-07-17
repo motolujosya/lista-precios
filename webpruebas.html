@@ -361,16 +361,17 @@
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
        Si tu impresora es de 58mm, cambia "80mm" por "58mm" aquí abajo
        y el "width: 76mm" de #reciboModalContent por "width: 54mm". */
-    /* 📏 Este @page de 3000mm es solo un RESPALDO por si algo falla con
-       JavaScript. El tamaño real que se usa lo calcula la función
-       imprimirRecibo() (ver <script>), que mide el alto exacto del recibo
-       ya renderizado y genera un @page a la medida justo antes de imprimir,
-       agregando una hoja <style id="reciboPageSizeAjuste"> que, al ir
-       después en el documento, sobrescribe este valor por defecto.
-       Si tu impresora usa rollos de 58mm, cambia también el "80mm" (aquí,
-       en el "width: 76mm" de #reciboModalContent más abajo, y en la
-       constante anchoMM dentro de imprimirRecibo()). */
-    @page { size: 80mm 3000mm; margin: 0; }
+    /* 📏 "size: 80mm auto" es la clave: el ancho queda fijo (80mm, el
+       ancho real del rollo térmico) pero el ALTO lo calcula el propio
+       navegador según el contenido ya renderizado con estos mismos
+       estilos de impresión — sin necesidad de que JavaScript lo adivine
+       desde el tamaño en pantalla (eso fallaba porque en pantalla el
+       texto es más chico/delgado que al imprimir, y el cálculo se
+       quedaba corto, partiendo el recibo en una segunda página casi
+       vacía con el QR solo). Con "auto" el recibo siempre sale en una
+       sola página, del largo exacto que necesite, sin importar cuántos
+       productos tenga. */
+    @page { size: 80mm auto; margin: 0; }
     html, body { margin: 0; padding: 0; height: auto !important; }
 
     /* Se saca TODO del flujo con display:none (no solo visibility:hidden).
@@ -2164,43 +2165,26 @@ function mostrarSugerencias(code) {
 
   let ultimoReciboData = null;
 
-  // 🖨️ Imprime ajustando el largo de la hoja al contenido real del recibo.
-  // Antes se usaba un largo fijo enorme (3000mm) para evitar que drivers de
-  // impresoras térmicas cortaran el recibo a la mitad, pero eso hacía que al
-  // imprimir a una impresora normal o guardar como PDF saliera una hoja
-  // gigante casi en blanco. Aquí medimos el alto real en píxeles del recibo
-  // ya renderizado (incluyendo el QR), lo convertimos a milímetros y
-  // generamos un @page a la medida justo antes de llamar a window.print().
-  // Este es el ÚNICO flujo de impresión de la app: se usa igual para venta,
-  // cotización, devolución y reimpresión desde el historial, así que el
-  // ajuste aplica automáticamente a todos los casos.
+  // 🖨️ Imprime el recibo (venta, cotización, devolución o reimpresión: todas
+  // pasan por esta misma función, es el único flujo de impresión de la app).
+  //
+  // Antes calculábamos el alto de la hoja con JavaScript, midiendo el recibo
+  // TAL COMO SE VE EN PANTALLA (dentro del modal) y convirtiéndolo a
+  // milímetros. El problema: al imprimir se aplican estilos distintos
+  // (letra más grande, más gruesa —ver reglas @media print más abajo—),
+  // así que el recibo impreso queda MÁS ALTO que lo medido en pantalla.
+  // Ese desfase hacía que el cálculo se quedara corto y el ticket se
+  // partiera en una segunda "página" casi vacía (por ejemplo, dejando el
+  // código QR solo, separado del resto).
+  //
+  // La solución robusta es "size: 80mm auto" en el @page (ver CSS de
+  // @media print): el ancho queda fijo en 80mm, pero el alto lo calcula
+  // el propio motor de impresión del navegador usando el layout YA
+  // renderizado con los estilos de impresión reales (incluido el QR), sin
+  // adivinar nada desde JavaScript. Por eso ya no hace falta medir nada
+  // aquí: basta con llamar a window.print().
   function imprimirRecibo() {
-    // Medimos #reciboPrint (el recibo en sí), NO #reciboModalContent, porque
-    // ese contenedor también incluye los botones de "Imprimir/Copiar/Cerrar"
-    // (solo se ocultan al imprimir, pero en pantalla normal sí suman alto),
-    // lo que inflaba el cálculo y dejaba espacio de sobra.
-    const recibo = document.getElementById("reciboPrint");
-    const anchoMM = 80; // Cambia a 58 si tu rollo/impresora es de 58mm
-    const pxPorMM = 96 / 25.4; // 96 DPI estándar de pantalla
-
-    // Esperamos dos frames de animación: el QR (canvas -> toDataURL -> img)
-    // y el resto del layout ya quedan pintados y con su tamaño final antes
-    // de medir, así el alto calculado siempre coincide con lo que se ve.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const altoMM = Math.ceil(recibo.getBoundingClientRect().height / pxPorMM) + 3; // pequeño margen de seguridad
-
-        let styleAjuste = document.getElementById("reciboPageSizeAjuste");
-        if (!styleAjuste) {
-          styleAjuste = document.createElement("style");
-          styleAjuste.id = "reciboPageSizeAjuste";
-          document.head.appendChild(styleAjuste);
-        }
-        styleAjuste.innerHTML = `@media print { @page { size: ${anchoMM}mm ${altoMM}mm; margin: 0 !important; } }`;
-
-        window.print();
-      });
-    });
+    window.print();
   }
 
   function mostrarRecibo(r) {

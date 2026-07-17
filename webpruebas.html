@@ -373,7 +373,7 @@
   #reciboPrint .recibo-sub { text-align: center; font-size: 11px; color: #333; line-height: 1.4; }
   #reciboPrint .recibo-linea { border-top: 1.5px dashed #000; margin: 8px 0; }
   #reciboPrint .recibo-dato { font-size: 12px; margin: 2px 0; }
-  #reciboPrint table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+  #reciboPrint table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 12px; }
   #reciboPrint td { padding: 2px 0; vertical-align: top; }
   #reciboPrint td:first-child { word-break: break-word; padding-right: 4px; }
   #reciboPrint td:last-child { white-space: nowrap; width: 1%; }
@@ -439,6 +439,14 @@
       height: auto !important;
       margin: 0 !important;
       padding: 0 !important;
+      /* Refuerzo extra: si por algún motivo el navegador/driver terminara
+         usando una hoja más alta de lo que mide el recibo (por ejemplo,
+         porque el driver de la impresora fuerza un tamaño de papel fijo
+         en vez del que calculamos), esto garantiza que el contenido
+         quede pegado ARRIBA y nunca se vea centrado verticalmente en
+         medio de la hoja. */
+      justify-content: flex-start !important;
+      align-items: flex-start !important;
     }
     #reciboModalContent {
       box-shadow: none !important;

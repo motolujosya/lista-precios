@@ -389,6 +389,7 @@
   .recibo-modal-actions button:first-child { background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; }
   .recibo-modal-actions button:last-child { background: #eee; color: #333; }
   .recibo-modal-actions .btn-copiar-whatsapp { background: linear-gradient(90deg, #25D366, #128C7E); color: #fff; }
+  .recibo-modal-actions .btn-usb { background: linear-gradient(90deg, #2c3e50, #4a6178); color: #fff; }
 
   @media print {
     /* 🖨️ Ajustado para impresora térmica POS de 80mm.
@@ -419,14 +420,22 @@
     #reciboModal, #reciboModal *,
     #reciboPrint, #reciboPrint * { display: revert !important; }
 
-    /* 🚫 Evita que el navegador parta un renglón, una fila de la tabla o
-       un bloque (total, QR, disclaimer) justo en la mitad si llegara a
-       calcular un salto de página. */
-    #reciboPrint, #reciboPrint * {
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-    }
-    #reciboModalContent {
+    /* 🚫 Si la hoja tiene un alto fijo (por ejemplo, porque el driver de
+       la impresora ignora el alto que calculamos y siempre usa 297mm) y
+       el recibo no cabe completo, el navegador va a tener que repartirlo
+       en varias hojas/cortes. Estas reglas evitan que el corte caiga a
+       la mitad de una fila de producto, del total, del aviso o del QR
+       (siempre agrupa esos bloques completos), pero A PROPÓSITO no se
+       aplica al recibo completo ni a la tabla en sí, para que SÍ puedan
+       repartirse en varias hojas cuando haga falta — si se le pusiera
+       "avoid" a todo el recibo junto, el navegador intentaría meterlo
+       entero en una sola hoja nueva sin partirlo, y como de todas formas
+       no cabe, terminaría partiéndolo de cualquier forma, de manera más
+       impredecible. */
+    #reciboPrint tr,
+    #reciboPrint .recibo-total,
+    #reciboPrint .recibo-disclaimer,
+    #reciboPrint .recibo-qr {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
@@ -1081,11 +1090,22 @@
     <div id="reciboPrint"></div>
     <div class="recibo-modal-actions">
       <button onclick="imprimirRecibo()">🖨️ Imprimir / Guardar PDF</button>
+      <button class="btn-usb" onclick="imprimirReciboUSB()" data-tooltip="Requiere conectar la impresora por USB primero (ver configuración)">🔌 Imprimir por USB</button>
       <button class="btn-copiar-whatsapp" onclick="copiarReciboWhatsapp()">📋 Copiar p/ WhatsApp</button>
       <button onclick="document.getElementById('reciboModal').style.display='none'">Cerrar</button>
     </div>
   </div>
 </div>
+
+<!-- Botón para conectar/vincular por primera vez la impresora térmica USB
+     (fuera del modal, porque WebUSB exige un clic del usuario para pedir
+     el permiso, y esto puede hacerse en cualquier momento antes de
+     imprimir, no necesariamente al abrir el recibo). -->
+<button id="btnConectarUSB" onclick="conectarImpresoraUSB()"
+  style="position: fixed; bottom: 10px; left: 10px; z-index: 500; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 12px;"
+  data-tooltip="Conecta tu impresora térmica por USB para poder usar 'Imprimir por USB'">
+  🔌 Conectar impresora USB
+</button>
 
 <!-- Modal Buscar Recibos -->
 <div id="buscarRecibosModal">
@@ -2188,6 +2208,312 @@ function mostrarSugerencias(code) {
   }
 
   let ultimoReciboData = null;
+
+  // ============================================================
+  // 🔌🖨️ IMPRESIÓN DIRECTA POR USB (ESC/POS) — alternativa opcional
+  // ============================================================
+  // La impresión normal (más abajo, imprimirRecibo()) pasa por el diálogo
+  // de impresión del navegador y el driver de Windows — y algunos drivers
+  // (como el de la XP-80C) fuerzan un alto de página fijo (297mm) sin
+  // importar lo que la web pida, cortando recibos largos en varias hojas.
+  //
+  // Esta función habla DIRECTO con la impresora por USB, mandándole
+  // comandos ESC/POS en crudo (el "idioma nativo" de las impresoras
+  // térmicas). Así se salta por completo el sistema de páginas de
+  // Windows: el papel se corta justo donde termina el contenido, sin
+  // límite de 297mm.
+  //
+  // REQUISITOS:
+  // 1. La página debe verse por HTTPS (o localhost) — WebUSB no funciona
+  //    en HTTP normal. GitHub Pages ya sirve por HTTPS, así que esto no
+  //    debería ser un problema para tu sitio.
+  // 2. En Windows, la impresora normalmente está "tomada" por su driver
+  //    de impresión estándar (usbprint.sys), y mientras esté así, Chrome
+  //    NO puede hablarle directo por USB. Hay que reemplazar su driver
+  //    por uno tipo WinUSB con la herramienta gratuita "Zadig"
+  //    (https://zadig.akeo.ie/). OJO: al hacer esto, la impresora deja
+  //    de aparecer en el diálogo normal de "Imprimir" de Windows —
+  //    queda dedicada a esta web mientras tenga ese driver.
+  // 3. La primera vez que uses el botón "Imprimir por USB", el navegador
+  //    te va a pedir elegir el dispositivo de una lista (permiso único).
+
+  let dispositivoUSB = null;
+  let endpointSalidaUSB = null;
+
+  // Busca, dentro de un dispositivo USB ya abierto, la interfaz y el
+  // "endpoint" de salida (por donde se le mandan los datos a imprimir).
+  function buscarEndpointSalida(dispositivo) {
+    for (const config of dispositivo.configurations) {
+      for (const iface of config.interfaces) {
+        for (const alt of iface.alternates) {
+          const out = alt.endpoints.find(e => e.direction === "out");
+          if (out) return { interfaz: iface.interfaceNumber, endpoint: out.endpointNumber };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function conectarImpresoraUSB() {
+    if (!("usb" in navigator)) {
+      alert("Tu navegador no soporta impresión directa por USB (WebUSB). Usa Chrome o Edge en computador — no funciona en celular, ni en Safari o Firefox.");
+      return false;
+    }
+    try {
+      // No podemos filtrar por "impresoras térmicas" de forma confiable
+      // (cada fabricante usa un vendorId distinto), así que mostramos
+      // todos los dispositivos USB disponibles y el usuario elige.
+      const dispositivo = await navigator.usb.requestDevice({ filters: [] });
+      await dispositivo.open();
+      if (dispositivo.configuration === null) await dispositivo.selectConfiguration(1);
+
+      const hallazgo = buscarEndpointSalida(dispositivo);
+      if (!hallazgo) {
+        alert("No se encontró un canal de datos de salida en ese dispositivo. ¿Seguro que elegiste la impresora y no otro dispositivo USB?");
+        await dispositivo.close();
+        return false;
+      }
+      await dispositivo.claimInterface(hallazgo.interfaz);
+      dispositivoUSB = dispositivo;
+      endpointSalidaUSB = hallazgo.endpoint;
+      showToast("✅ Impresora USB conectada");
+      return true;
+    } catch (e) {
+      if (e.name === "NotFoundError") return false; // el usuario cerró el selector, no es un error real
+      console.error(e);
+      alert("No se pudo conectar con la impresora por USB: " + e.message + "\n\n¿Ya instalaste el driver WinUSB con Zadig para este dispositivo? Sin eso, Windows no deja que el navegador le hable directo a la impresora.");
+      return false;
+    }
+  }
+
+  // Si el usuario ya autorizó el dispositivo antes, intenta reconectar
+  // sin volver a pedir permiso (el permiso de WebUSB queda guardado).
+  async function reconectarImpresoraUSBGuardada() {
+    if (!("usb" in navigator)) return false;
+    const dispositivos = await navigator.usb.getDevices();
+    if (dispositivos.length === 0) return false;
+    const dispositivo = dispositivos[0];
+    try {
+      await dispositivo.open();
+      if (dispositivo.configuration === null) await dispositivo.selectConfiguration(1);
+      const hallazgo = buscarEndpointSalida(dispositivo);
+      if (!hallazgo) return false;
+      await dispositivo.claimInterface(hallazgo.interfaz);
+      dispositivoUSB = dispositivo;
+      endpointSalidaUSB = hallazgo.endpoint;
+      return true;
+    } catch (e) {
+      console.error("No se pudo reconectar automáticamente a la impresora USB:", e);
+      return false;
+    }
+  }
+
+  async function enviarBytesAImpresoraUSB(bytes) {
+    if (!dispositivoUSB) {
+      const ok = (await reconectarImpresoraUSBGuardada()) || (await conectarImpresoraUSB());
+      if (!ok) return false;
+    }
+    try {
+      await dispositivoUSB.transferOut(endpointSalidaUSB, bytes);
+      return true;
+    } catch (e) {
+      console.error(e);
+      alert("Error enviando los datos a la impresora: " + e.message);
+      return false;
+    }
+  }
+
+  // --- Construcción de los comandos ESC/POS ---
+
+  // Caracteres por línea. Este número depende del modelo/fuente de tu
+  // impresora (a veces 32, a veces 42, a veces 48 para 80mm). Si el
+  // texto sale muy angosto (sobra papel a los lados) o muy ancho (se
+  // corta), ajusta este número y prueba de nuevo.
+  const ESCPOS_ANCHO_COLUMNAS = 42;
+
+  function centrarTexto(texto, ancho) {
+    texto = texto.slice(0, ancho);
+    const espacio = Math.max(0, Math.floor((ancho - texto.length) / 2));
+    return " ".repeat(espacio) + texto;
+  }
+
+  function lineaDeGuiones(ancho) {
+    return "-".repeat(ancho);
+  }
+
+  // Parte un texto largo en varias líneas de máximo `ancho` caracteres,
+  // sin cortar palabras a la mitad cuando es posible.
+  function envolverTexto(texto, ancho) {
+    const palabras = String(texto).split(" ");
+    const lineas = [];
+    let actual = "";
+    for (const palabra of palabras) {
+      const candidata = actual ? actual + " " + palabra : palabra;
+      if (candidata.length > ancho) {
+        if (actual) lineas.push(actual);
+        actual = palabra.length > ancho ? palabra.slice(0, ancho) : palabra;
+      } else {
+        actual = candidata;
+      }
+    }
+    if (actual) lineas.push(actual);
+    return lineas.length ? lineas : [""];
+  }
+
+  // Arma una "fila de producto": la descripción a la izquierda (puede
+  // ocupar varias líneas si es larga) y el precio pegado al margen
+  // derecho en la última línea de esa descripción.
+  function filaProductoTexto(descripcion, precioTexto, ancho) {
+    const lineas = envolverTexto(descripcion, ancho);
+    const ultima = lineas[lineas.length - 1];
+    const espacioDisponible = ancho - ultima.length - precioTexto.length;
+    if (espacioDisponible >= 1) {
+      lineas[lineas.length - 1] = ultima + " ".repeat(espacioDisponible) + precioTexto;
+    } else {
+      // No cupo el precio en la misma línea de la descripción: va en su
+      // propia línea, pegado al margen derecho.
+      lineas.push(" ".repeat(Math.max(0, ancho - precioTexto.length)) + precioTexto);
+    }
+    return lineas.join("\n");
+  }
+
+  function textoDerecha(texto, ancho) {
+    texto = String(texto).slice(0, ancho);
+    return " ".repeat(Math.max(0, ancho - texto.length)) + texto;
+  }
+
+  // Convierte un texto a bytes de 1 byte por carácter (compatible con
+  // tildes/ñ en la mayoría de impresoras vía la página de códigos
+  // Windows-1252 / ISO-8859-1). Si en tu impresora las tildes salen como
+  // símbolos raros, es porque usa otra página de códigos — avísame para
+  // ajustarlo.
+  function textoABytes(str) {
+    const bytes = [];
+    for (const ch of String(str)) {
+      const code = ch.codePointAt(0);
+      bytes.push(code <= 0xFF ? code : 0x3F); // "?" si el carácter no entra en 1 byte
+    }
+    return bytes;
+  }
+
+  // Arma el bloque de comandos ESC/POS para imprimir un código QR nativo
+  // (lo dibuja la propia impresora, no es una imagen — sale más nítido).
+  function comandosQrEscPos(datos) {
+    const bytesDatos = new TextEncoder().encode(datos); // el QR sí va en UTF-8/ASCII normal
+    const cmds = [];
+    const push = arr => cmds.push(...arr);
+
+    // Modelo de QR (modelo 2, el estándar)
+    push([0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+    // Tamaño del "punto" del QR (1-16, más alto = QR más grande)
+    push([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06]);
+    // Nivel de corrección de errores (48=L, 49=M, 50=Q, 51=H)
+    push([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31]);
+    // Guarda los datos del QR en el buffer de la impresora
+    const largo = bytesDatos.length + 3;
+    const pL = largo & 0xFF, pH = (largo >> 8) & 0xFF;
+    push([0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30]);
+    push(Array.from(bytesDatos));
+    // Imprime el QR guardado
+    push([0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
+
+    return cmds;
+  }
+
+  // Arma el recibo COMPLETO (texto formateado + QR + corte) en comandos
+  // ESC/POS listos para mandar por USB.
+  function generarComandosEscPos(r) {
+    const ancho = ESCPOS_ANCHO_COLUMNAS;
+    const esDevolucion = r.tipo === "Devolucion";
+    const esCotizacion = r.tipo === "Cotizacion";
+    const signo = esDevolucion ? -1 : 1;
+
+    const ESC = 0x1B, GS = 0x1D;
+    const cmds = [];
+    const texto = (str) => cmds.push(...textoABytes(str), 0x0A); // imprime texto + salto de línea
+    const alinear = (n) => cmds.push(ESC, 0x61, n); // 0=izq 1=centro 2=der
+    const negrita = (on) => cmds.push(ESC, 0x45, on ? 1 : 0);
+    const doble = (on) => cmds.push(GS, 0x21, on ? 0x11 : 0x00); // doble ancho+alto
+
+    cmds.push(ESC, 0x40); // inicializar impresora
+    cmds.push(ESC, 0x74, 16); // intento de página de códigos WPC1252 (tildes/ñ)
+
+    alinear(1);
+    doble(true); negrita(true);
+    texto(esDevolucion ? "NOTA DE DEVOLUCIÓN" : NEGOCIO.nombre);
+    doble(false); negrita(false);
+    if (esDevolucion) texto(NEGOCIO.nombre);
+    if (esCotizacion) { negrita(true); texto("COTIZACIÓN"); negrita(false); }
+    texto(NEGOCIO.nit);
+    texto(NEGOCIO.direccion);
+    texto(NEGOCIO.telefono);
+
+    alinear(0);
+    texto(lineaDeGuiones(ancho));
+    if (!esCotizacion) texto(`Recibo No: ${r.numero}`);
+    if (esDevolucion && r.reciboOriginal) texto(`Devolución del recibo: #${r.reciboOriginal}`);
+    texto(`Fecha: ${r.fecha}`);
+    if (r.clienteNombre) texto(`Cliente: ${r.clienteNombre}`);
+    if (r.clienteDoc) texto(`Cédula/NIT: ${r.clienteDoc}`);
+    if (r.clienteTel) texto(`Tel: ${r.clienteTel}`);
+    texto(lineaDeGuiones(ancho));
+
+    r.items.forEach(i => {
+      const descripcion = `${i.qty}x ${i.label || i.name}`;
+      const precioTexto = formatCurrency(signo * i.qty * i.price);
+      texto(filaProductoTexto(descripcion, precioTexto, ancho));
+    });
+
+    texto(lineaDeGuiones(ancho));
+    if (!esDevolucion && r.descuento > 0) {
+      texto(textoDerecha(`Subtotal: ${formatCurrency(r.subtotal)}`, ancho));
+      texto(textoDerecha(`Descuento: -${formatCurrency(r.descuento)}`, ancho));
+    }
+    negrita(true);
+    const etiquetaTotal = esDevolucion ? "TOTAL DEVUELTO" : (esCotizacion ? "TOTAL COTIZADO" : "TOTAL");
+    texto(textoDerecha(`${etiquetaTotal}: ${formatCurrency(Math.abs(r.total))}`, ancho));
+    negrita(false);
+    if (!esDevolucion && !esCotizacion) texto(textoDerecha(`Forma de pago: ${r.formaPago}`, ancho));
+    if (r.pagoCon) texto(textoDerecha(`Paga con: ${formatCurrency(r.pagoCon)} · Cambio: ${formatCurrency(r.cambio)}`, ancho));
+    texto(lineaDeGuiones(ancho));
+
+    alinear(1);
+    const disclaimer = esDevolucion
+      ? "Documento interno de devolución. No constituye nota crédito electrónica ante la DIAN."
+      : esCotizacion
+      ? "Documento informativo. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario. No constituye factura de venta."
+      : "Documento interno de venta. No constituye factura electrónica ante la DIAN.";
+    envolverTexto(disclaimer, ancho).forEach(linea => texto(linea));
+
+    if (NEGOCIO.whatsapp) {
+      let mensaje;
+      if (r.tipo === "Cotizacion") mensaje = "Hola, quiero consultar sobre esta cotización";
+      else if (r.tipo === "Devolucion") mensaje = `Hola, tengo una consulta sobre mi devolución${r.numero ? " #" + r.numero : ""}`;
+      else mensaje = `Hola, tengo una consulta sobre mi compra${r.numero ? " #" + r.numero : ""}`;
+      const urlQR = `https://wa.me/${NEGOCIO.whatsapp}?text=${encodeURIComponent(mensaje)}`;
+
+      cmds.push(0x0A);
+      cmds.push(...comandosQrEscPos(urlQR));
+      cmds.push(0x0A);
+      texto("Escanéalo y escríbenos por WhatsApp");
+    }
+
+    // Espacio antes del corte + corte de papel (parcial). Si tu impresora
+    // no tiene cuchilla automática, este comando simplemente se ignora.
+    cmds.push(0x0A, 0x0A, 0x0A);
+    cmds.push(GS, 0x56, 0x01); // GS V 1 = corte parcial
+
+    return new Uint8Array(cmds);
+  }
+
+  // Botón "Imprimir por USB": arma los comandos del último recibo
+  // mostrado y los manda directo a la impresora conectada por USB.
+  async function imprimirReciboUSB() {
+    if (!ultimoReciboData) return;
+    const bytes = generarComandosEscPos(ultimoReciboData);
+    const ok = await enviarBytesAImpresoraUSB(bytes);
+    if (ok) showToast("🖨️ Enviado a la impresora por USB");
+  }
 
   // 🖨️ Imprime el recibo (venta, cotización, devolución o reimpresión: todas
   // pasan por esta misma función, es el único flujo de impresión de la app).

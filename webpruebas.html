@@ -2361,25 +2361,54 @@ function mostrarSugerencias(code) {
   }
 
   // Arma una "fila de producto": la descripción a la izquierda (puede
-  // ocupar varias líneas si es larga) y el precio pegado al margen
-  // derecho en la última línea de esa descripción.
-  function filaProductoTexto(descripcion, precioTexto, ancho) {
+  // ocupar varias líneas si es larga) y el precio, EN NEGRILLA, pegado
+  // al margen derecho en la última línea de esa descripción. A
+  // diferencia de otras funciones de texto, esta empuja directamente
+  // los bytes a `cmds` porque necesita alternar negrilla solo para la
+  // parte del precio.
+  function imprimirFilaProducto(cmds, negritaFn, descripcion, precioTexto, ancho) {
     const lineas = envolverTexto(descripcion, ancho);
     const ultima = lineas[lineas.length - 1];
     const espacioDisponible = ancho - ultima.length - precioTexto.length;
-    if (espacioDisponible >= 1) {
-      lineas[lineas.length - 1] = ultima + " ".repeat(espacioDisponible) + precioTexto;
-    } else {
-      // No cupo el precio en la misma línea de la descripción: va en su
-      // propia línea, pegado al margen derecho.
-      lineas.push(" ".repeat(Math.max(0, ancho - precioTexto.length)) + precioTexto);
+
+    // Todas las líneas de la descripción, excepto la última, van solas.
+    for (let idx = 0; idx < lineas.length - 1; idx++) {
+      cmds.push(...textoABytes(lineas[idx]), 0x0A);
     }
-    return lineas.join("\n");
+
+    if (espacioDisponible >= 1) {
+      // El precio cabe al final de la última línea de la descripción.
+      cmds.push(...textoABytes(ultima + " ".repeat(espacioDisponible)));
+      negritaFn(true);
+      cmds.push(...textoABytes(precioTexto), 0x0A);
+      negritaFn(false);
+    } else {
+      // No cupo: la descripción va en su línea, y el precio en la suya,
+      // pegado al margen derecho.
+      cmds.push(...textoABytes(ultima), 0x0A);
+      cmds.push(...textoABytes(" ".repeat(Math.max(0, ancho - precioTexto.length))));
+      negritaFn(true);
+      cmds.push(...textoABytes(precioTexto), 0x0A);
+      negritaFn(false);
+    }
   }
 
   function textoDerecha(texto, ancho) {
     texto = String(texto).slice(0, ancho);
     return " ".repeat(Math.max(0, ancho - texto.length)) + texto;
+  }
+
+  // Reemplaza caracteres "elegantes" (guion largo, comillas curvas,
+  // puntos suspensivos, viñetas) por su equivalente simple en ASCII.
+  // Estos caracteres especiales están fuera del rango de 1 byte y por
+  // eso salían como "?" al imprimir — con este cambio se imprimen bien.
+  function normalizarTexto(str) {
+    return String(str)
+      .replace(/[\u2010-\u2015]/g, "-")   // guion corto/medio/largo (– —) -> "-"
+      .replace(/[\u2018\u2019]/g, "'")     // comillas simples curvas
+      .replace(/[\u201C\u201D]/g, '"')     // comillas dobles curvas
+      .replace(/\u2026/g, "...")           // puntos suspensivos (…)
+      .replace(/\u2022/g, "*");            // viñeta (•)
   }
 
   // Convierte un texto a bytes de 1 byte por carácter (compatible con
@@ -2389,7 +2418,7 @@ function mostrarSugerencias(code) {
   // ajustarlo.
   function textoABytes(str) {
     const bytes = [];
-    for (const ch of String(str)) {
+    for (const ch of normalizarTexto(str)) {
       const code = ch.codePointAt(0);
       bytes.push(code <= 0xFF ? code : 0x3F); // "?" si el carácter no entra en 1 byte
     }
@@ -2428,15 +2457,23 @@ function mostrarSugerencias(code) {
     const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
-    const ESC = 0x1B, GS = 0x1D;
+    const ESC = 0x1B, GS = 0x1D, FS = 0x1C;
     const cmds = [];
     const texto = (str) => cmds.push(...textoABytes(str), 0x0A); // imprime texto + salto de línea
+    const textoLargoCentrado = (str) => envolverTexto(str, ancho).forEach(linea => texto(centrarTexto(linea, ancho)));
     const alinear = (n) => cmds.push(ESC, 0x61, n); // 0=izq 1=centro 2=der
     const negrita = (on) => cmds.push(ESC, 0x45, on ? 1 : 0);
     const doble = (on) => cmds.push(GS, 0x21, on ? 0x11 : 0x00); // doble ancho+alto
 
     cmds.push(ESC, 0x40); // inicializar impresora
-    cmds.push(ESC, 0x74, 16); // intento de página de códigos WPC1252 (tildes/ñ)
+    // 🈲 Muchas impresoras térmicas "clon" (como varias XP-80C genéricas)
+    // vienen con el modo de caracteres chinos/Kanji activo por defecto de
+    // fábrica. En ese modo, cualquier tilde o ñ (que ocupa un byte "alto",
+    // fuera del ASCII básico) se puede interpretar como parte de un
+    // carácter chino de 2 bytes, saliendo como símbolos chinos en vez de
+    // la letra con tilde. Este comando lo desactiva explícitamente.
+    cmds.push(FS, 0x2E); // FS . = cancela modo de caracteres chinos (Kanji)
+    cmds.push(ESC, 0x74, 16); // página de códigos WPC1252 (tildes/ñ)
 
     alinear(1);
     doble(true); negrita(true);
@@ -2445,8 +2482,11 @@ function mostrarSugerencias(code) {
     if (esDevolucion) texto(NEGOCIO.nombre);
     if (esCotizacion) { negrita(true); texto("COTIZACIÓN"); negrita(false); }
     texto(NEGOCIO.nit);
-    texto(NEGOCIO.direccion);
-    texto(NEGOCIO.telefono);
+    // La dirección y el teléfono pueden ser más largos que el ancho del
+    // papel — los partimos en varias líneas centradas en vez de dejar
+    // que la propia impresora los corte a la mitad de una palabra.
+    textoLargoCentrado(NEGOCIO.direccion);
+    textoLargoCentrado(NEGOCIO.telefono);
 
     alinear(0);
     texto(lineaDeGuiones(ancho));
@@ -2458,10 +2498,11 @@ function mostrarSugerencias(code) {
     if (r.clienteTel) texto(`Tel: ${r.clienteTel}`);
     texto(lineaDeGuiones(ancho));
 
-    r.items.forEach(i => {
+    r.items.forEach((i, idx) => {
+      if (idx > 0) texto(lineaDeGuiones(ancho)); // línea divisoria entre productos
       const descripcion = `${i.qty}x ${i.label || i.name}`;
       const precioTexto = formatCurrency(signo * i.qty * i.price);
-      texto(filaProductoTexto(descripcion, precioTexto, ancho));
+      imprimirFilaProducto(cmds, negrita, descripcion, precioTexto, ancho);
     });
 
     texto(lineaDeGuiones(ancho));
@@ -2483,7 +2524,7 @@ function mostrarSugerencias(code) {
       : esCotizacion
       ? "Documento informativo. Precios sujetos a cambio sin previo aviso y a disponibilidad de inventario. No constituye factura de venta."
       : "Documento interno de venta. No constituye factura electrónica ante la DIAN.";
-    envolverTexto(disclaimer, ancho).forEach(linea => texto(linea));
+    textoLargoCentrado(disclaimer);
 
     if (NEGOCIO.whatsapp) {
       let mensaje;
@@ -2495,12 +2536,16 @@ function mostrarSugerencias(code) {
       cmds.push(0x0A);
       cmds.push(...comandosQrEscPos(urlQR));
       cmds.push(0x0A);
-      texto("Escanéalo y escríbenos por WhatsApp");
+      textoLargoCentrado("Escanéalo y escríbenos por WhatsApp");
     }
 
-    // Espacio antes del corte + corte de papel (parcial). Si tu impresora
-    // no tiene cuchilla automática, este comando simplemente se ignora.
-    cmds.push(0x0A, 0x0A, 0x0A);
+    // Espacio antes del corte + corte de papel (parcial). El cabezal de
+    // impresión y la cuchilla NO están en el mismo punto físico: hay una
+    // distancia entre ellos, así que si no dejamos suficientes líneas en
+    // blanco antes de cortar, la cuchilla corta a la mitad del último
+    // texto impreso (aunque ya se haya impreso completo). Si tu impresora
+    // sigue cortando texto, sube este número (por ejemplo a 8).
+    for (let i = 0; i < 6; i++) cmds.push(0x0A);
     cmds.push(GS, 0x56, 0x01); // GS V 1 = corte parcial
 
     return new Uint8Array(cmds);

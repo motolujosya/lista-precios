@@ -1072,6 +1072,10 @@
       <button id="checkoutBtn" class="icon-btn" data-tooltip="Finalizar compra" aria-label="Finalizar compra">✅</button>
       <span class="cart-action-label">Finalizar</span>
     </div>
+    <div class="cart-action-item" id="btnConectarUSBWrapper" style="display:none;">
+      <button id="btnConectarUSB" class="icon-btn" onclick="conectarImpresoraUSB()" data-tooltip="Conectar impresora térmica por USB" aria-label="Conectar impresora USB">🔌</button>
+      <span class="cart-action-label">Conectar USB</span>
+    </div>
   </div>
 </div>
 
@@ -1096,16 +1100,6 @@
     </div>
   </div>
 </div>
-
-<!-- Botón para conectar/vincular por primera vez la impresora térmica USB
-     (fuera del modal, porque WebUSB exige un clic del usuario para pedir
-     el permiso, y esto puede hacerse en cualquier momento antes de
-     imprimir, no necesariamente al abrir el recibo). -->
-<button id="btnConectarUSB" onclick="conectarImpresoraUSB()"
-  style="position: fixed; bottom: 10px; left: 10px; z-index: 500; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 12px;"
-  data-tooltip="Conecta tu impresora térmica por USB para poder usar 'Imprimir por USB'">
-  🔌 Conectar impresora USB
-</button>
 
 <!-- Modal Buscar Recibos -->
 <div id="buscarRecibosModal">
@@ -1331,7 +1325,18 @@
     if (!response || !response.table) return alert("Error cargando datos");
     const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase());
     const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
+
+    // 🖱️ Guardamos dónde estaba la pantalla ANTES de reconstruir la
+    // grilla (por ejemplo, tras una venta, cuando se recarga el catálogo
+    // para reflejar el inventario actualizado), para no perder de vista
+    // lo que el cajero estaba buscando.
+    const scrollPrevio = window.scrollY;
+
     renderProducts(cols, rows);
+    filterProducts(); // vuelve a aplicar el texto de búsqueda actual sobre las tarjetas recién creadas
+    sincronizarCarritoConCatalogo(); // ver definición más abajo (punto 3: mantener el carrito al día con el catálogo)
+
+    window.scrollTo({ top: scrollPrevio, behavior: "instant" });
   };
   const s = document.createElement('script');
   s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
@@ -1674,11 +1679,28 @@
   
 
 
+  // Determina si el precio elegido al agregar al carrito corresponde a la
+  // tarifa "público" o "taller" del producto (comparando contra los datos
+  // actuales del catálogo). Se usa para poder re-sincronizar el precio
+  // correcto más adelante si el producto se actualiza en el catálogo
+  // (ver sincronizarCarritoConCatalogo()). Si no se puede determinar
+  // (por ejemplo, un precio manual/personalizado), devuelve null y el
+  // precio de ese ítem simplemente no se auto-actualiza después.
+  function detectarTarifaProducto(code, price) {
+    const producto = productosData.find(p => p.code === code);
+    if (!producto) return null;
+    const num = parseFloat(price);
+    if (parseFloat(producto.price) === num) return "publico";
+    if (parseFloat(producto.priceDesc) === num) return "taller";
+    return null;
+  }
+
   function addToCart(name, price, code = "", info = "") {
     const label = buildProductLabel(code, name, info);
+    const tarifa = detectarTarifaProducto(code, price);
     const existing = cart.find(p => p.code === code && p.price == price);
     if (existing) existing.qty++;
-    else cart.push({ code, name, info, label, price: parseFloat(price), qty: 1 });
+    else cart.push({ code, name, info, label, price: parseFloat(price), qty: 1, tarifa });
     updateCartDisplay();
     animateCartCount();
     mostrarSugerencias(code);
@@ -1687,6 +1709,51 @@
 
 function buildProductLabel(code, name, info) {
   return [code, name, info].filter(Boolean).join(" ");
+}
+
+// 🔄 Sincroniza UN ítem del carrito con los datos más recientes del
+// catálogo (nombre, info, descripción y precio según la tarifa
+// público/taller que se había elegido). Devuelve true si cambió algo.
+// Se usa tanto al recargar el catálogo (sincronizarCarritoConCatalogo)
+// como al cargar un pedido guardado (cargarPedidoGuardado).
+function sincronizarItemConCatalogo(item) {
+  const producto = productosData.find(p => p.code === item.code);
+  if (!producto) return false; // el producto ya no existe en el catálogo: se deja tal cual
+
+  let cambio = false;
+
+  if (producto.name !== item.name || producto.info !== item.info) {
+    item.name = producto.name;
+    item.info = producto.info;
+    item.label = buildProductLabel(item.code, producto.name, producto.info);
+    cambio = true;
+  }
+
+  // Si no sabemos qué tarifa se eligió (por ejemplo, un pedido guardado
+  // ANTES de que existiera este campo), asumimos "público" como respaldo
+  // razonable, igual que se hacía antes.
+  const tarifa = item.tarifa === "taller" ? "taller" : "publico";
+  const nuevoPrecio = parseFloat(tarifa === "taller" ? producto.priceDesc : producto.price);
+  if (!isNaN(nuevoPrecio) && nuevoPrecio !== item.price) {
+    item.price = nuevoPrecio;
+    cambio = true;
+  }
+
+  return cambio;
+}
+
+// 🔄 Mantiene el carrito al día con el catálogo: cada vez que se recargan
+// los datos de productos (por ejemplo, tras una venta, o simplemente al
+// abrir la página), busca cada producto del carrito por su código y
+// actualiza nombre, info, descripción y precio (según la tarifa que se
+// había elegido) con los datos MÁS RECIENTES del catálogo. Así, si editas
+// el nombre/info/precio de un producto en la hoja de cálculo, los pedidos
+// que ya tengas en el carrito (o que cargues desde "Pedidos guardados")
+// reflejan el cambio en vez de quedarse con una foto vieja.
+function sincronizarCarritoConCatalogo() {
+  if (!cart.length) return;
+  const huboCambios = cart.map(sincronizarItemConCatalogo).some(Boolean);
+  if (huboCambios) updateCartDisplay();
 }
 
 function mostrarSugerencias(code) {
@@ -2128,18 +2195,15 @@ function mostrarSugerencias(code) {
 
     cart = JSON.parse(JSON.stringify(quote.items));
 
-    // 💲 Actualiza cada producto al precio VIGENTE del catálogo (buscando
-    // por código), en vez de dejar el precio "congelado" de cuando se
-    // guardó el pedido. Si el producto ya no existe o no tiene código,
-    // se conserva el precio que traía guardado, como respaldo.
+    // 💲 Actualiza cada producto con los datos VIGENTES del catálogo
+    // (nombre, info y precio según la tarifa público/taller elegida),
+    // en vez de dejarlo "congelado" con lo que tenía cuando se guardó el
+    // pedido. Si el producto ya no existe en el catálogo, se conserva
+    // como respaldo lo que traía guardado.
     let preciosActualizados = 0;
     cart.forEach(item => {
       if (!item.code) return;
-      const actual = productosData.find(p => p.code === item.code);
-      if (actual && actual.price !== item.price) {
-        item.price = actual.price;
-        preciosActualizados++;
-      }
+      if (sincronizarItemConCatalogo(item)) preciosActualizados++;
     });
 
     // Restaura el descuento/total manual guardado con el pedido (si tiene)
@@ -2159,7 +2223,7 @@ function mostrarSugerencias(code) {
     document.getElementById("quotesModal").style.display = "none";
     cartPanel.classList.add("open");
     showToast(preciosActualizados > 0
-      ? `📥 Pedido "${quote.nombre}" cargado. Se actualizaron ${preciosActualizados} precio(s) al valor vigente.`
+      ? `📥 Pedido "${quote.nombre}" cargado. Se actualizaron ${preciosActualizados} producto(s) con los datos vigentes del catálogo.`
       : `📥 Pedido "${quote.nombre}" cargado en el carrito.`);
   }
 
@@ -2240,6 +2304,28 @@ function mostrarSugerencias(code) {
   let dispositivoUSB = null;
   let endpointSalidaUSB = null;
 
+  // 👁️ Muestra el botón "Conectar USB" del carrito SOLO si todavía no hay
+  // ninguna impresora vinculada; si ya se conectó una vez (y el navegador
+  // recuerda el permiso), el botón se oculta solo para no estorbar.
+  function actualizarVisibilidadBotonUSB() {
+    const wrapper = document.getElementById("btnConectarUSBWrapper");
+    if (!wrapper) return;
+    if (dispositivoUSB) {
+      wrapper.style.display = "none";
+      return;
+    }
+    if (!("usb" in navigator)) {
+      wrapper.style.display = "none"; // navegador sin soporte: no tiene sentido mostrarlo
+      return;
+    }
+    navigator.usb.getDevices().then(dispositivos => {
+      wrapper.style.display = dispositivos.length > 0 ? "none" : "flex";
+    }).catch(() => { wrapper.style.display = "flex"; });
+  }
+  // Revisamos el estado apenas carga la página (por si ya se había
+  // conectado antes en una sesión anterior).
+  document.addEventListener("DOMContentLoaded", actualizarVisibilidadBotonUSB);
+
   // Busca, dentro de un dispositivo USB ya abierto, la interfaz y el
   // "endpoint" de salida (por donde se le mandan los datos a imprimir).
   function buscarEndpointSalida(dispositivo) {
@@ -2277,6 +2363,7 @@ function mostrarSugerencias(code) {
       dispositivoUSB = dispositivo;
       endpointSalidaUSB = hallazgo.endpoint;
       showToast("✅ Impresora USB conectada");
+      actualizarVisibilidadBotonUSB();
       return true;
     } catch (e) {
       if (e.name === "NotFoundError") return false; // el usuario cerró el selector, no es un error real
@@ -2301,6 +2388,7 @@ function mostrarSugerencias(code) {
       await dispositivo.claimInterface(hallazgo.interfaz);
       dispositivoUSB = dispositivo;
       endpointSalidaUSB = hallazgo.endpoint;
+      actualizarVisibilidadBotonUSB();
       return true;
     } catch (e) {
       console.error("No se pudo reconectar automáticamente a la impresora USB:", e);

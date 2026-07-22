@@ -1729,9 +1729,20 @@ function sincronizarItemConCatalogo(item) {
     cambio = true;
   }
 
-  // Si no sabemos qué tarifa se eligió (por ejemplo, un pedido guardado
-  // ANTES de que existiera este campo), asumimos "público" como respaldo
-  // razonable, igual que se hacía antes.
+  // Si no sabemos qué tarifa se eligió porque el campo ni siquiera existe
+  // (por ejemplo, un pedido guardado ANTES de que existiera este campo),
+  // asumimos "público" como respaldo razonable, igual que se hacía antes.
+  //
+  // OJO: esto es distinto de que item.tarifa sea explícitamente `null`.
+  // `null` significa que detectarTarifaProducto() no pudo identificar el
+  // precio como público ni como taller (por ejemplo, un precio manual o
+  // negociado con el cliente). En ese caso NO se debe forzar el precio
+  // público: hay que respetar el precio con el que se guardó el pedido,
+  // porque de lo contrario se pierde el valor original (el bug que hacía
+  // que las cotizaciones recargadas mostraran precio público en vez del
+  // precio con el que realmente se guardaron).
+  if (item.tarifa === null) return cambio;
+
   const tarifa = item.tarifa === "taller" ? "taller" : "publico";
   const nuevoPrecio = parseFloat(tarifa === "taller" ? producto.priceDesc : producto.price);
   if (!isNaN(nuevoPrecio) && nuevoPrecio !== item.price) {
@@ -1960,16 +1971,28 @@ function mostrarSugerencias(code) {
       return;
     }
 
-    devolucionContexto = { numeroOriginal: (r[0] || "").toString(), items };
+    // 💲 Los precios guardados en el detalle del recibo (items) son el
+    // precio BASE de cada producto (sin descuento), porque el descuento de
+    // la venta se aplica sobre el total del carrito, no producto por
+    // producto. Si la venta tuvo descuento, hay que prorratearlo aquí para
+    // que la devolución se calcule sobre el precio REALMENTE pagado, y no
+    // sobre el precio base (lo que haría que la devolución fuera mayor de
+    // lo que el cliente pagó).
+    const subtotalOriginal = items.reduce((s, it) => s + (it.qty * it.price), 0);
+    const totalOriginal = parseFloat(r[7]) || 0;
+    const factorDescuento = subtotalOriginal > 0 ? (totalOriginal / subtotalOriginal) : 1;
+
+    devolucionContexto = { numeroOriginal: (r[0] || "").toString(), items, factorDescuento };
 
     document.getElementById("devolucionInfo").innerHTML =
-      `Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""} · ${r[1]}`;
+      `Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""} · ${r[1]}` +
+      (factorDescuento < 1 ? ` · <span style="color:#d35400;">incluye descuento, se devuelve el precio pagado</span>` : "");
 
     document.getElementById("devolucionItems").innerHTML = items.map((it, idx) => `
       <div class="devolucion-item-row">
         <div class="di-info">
           <strong>${it.label || it.name}</strong>
-          <span>Vendido: ${it.qty} x ${formatCurrency(it.price)}</span>
+          <span>Vendido: ${it.qty} x ${formatCurrency(it.price * factorDescuento)}</span>
         </div>
         <input type="number" min="0" max="${it.qty}" value="0" data-idx="${idx}" class="devolucion-qty-input">
       </div>
@@ -1985,6 +2008,8 @@ function mostrarSugerencias(code) {
     const inputs = document.querySelectorAll(".devolucion-qty-input");
     const itemsADevolver = [];
 
+    const factorDescuento = devolucionContexto.factorDescuento || 1;
+
     inputs.forEach(inp => {
       const qty = parseInt(inp.value) || 0;
       if (qty > 0) {
@@ -1994,7 +2019,10 @@ function mostrarSugerencias(code) {
           name: item.name,
           label: item.label,
           qty,
-          price: item.price
+          // 💲 Se devuelve el precio realmente pagado (precio base con el
+          // descuento de la venta ya prorrateado), no el precio base sin
+          // descuento, para que el valor devuelto no sea mayor a lo pagado.
+          price: Math.round(item.price * factorDescuento)
         });
       }
     });

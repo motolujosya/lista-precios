@@ -3177,8 +3177,11 @@ function parseFechaSheet(val) {
         });
     }
 
-    // Mostrar resumen por día
-    let resumenHTML = "💰 Totales por día:<br><br>";
+    // Mostrar resumen por día + total general del rango mostrado/filtrado
+    const totalGeneral = Object.values(resumenDias).reduce((s, v) => s + v, 0);
+
+    let resumenHTML = `<div style="font-size:15px; margin-bottom:8px;">🧮 Total del periodo mostrado: ${formatCurrency(totalGeneral)}</div>`;
+    resumenHTML += "💰 Totales por día:<br><br>";
 
     Object.keys(resumenDias)
       .sort()

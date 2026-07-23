@@ -3332,12 +3332,13 @@ function conectarWS() {
     if (event.data === "__pong__") return; // ignorar respuesta de ping
     const datos = JSON.parse(event.data);
 
-    if (datos.status === "typing") {
-      // Muestra/actualiza la burbuja de "escribiendo..."
+    if (datos.status === "processing") {
+      // Muestra/actualiza la burbuja de "escribiendo..." con el paso actual del agente
+      const textoProceso = datos.response_text || "Procesando...";
       if (!typingBubble) {
-        typingBubble = agregarBurbuja(datos.message, "typing");
+        typingBubble = agregarBurbuja(textoProceso, "typing");
       } else {
-        typingBubble.textContent = datos.message;
+        typingBubble.textContent = textoProceso;
       }
     } else if (datos.status === "completed") {
       // Quita la burbuja de "escribiendo..."

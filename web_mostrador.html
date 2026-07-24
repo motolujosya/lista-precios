@@ -3301,7 +3301,7 @@ let pingInterval = null;
 function conectarWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  ws = new WebSocket(`wss://henry-acting-begin-assessing.trycloudflare.com/ws/${clientId}`);
+  ws = new WebSocket(`wss://advocate-usage-contribution-picnic.trycloudflare.com/ws/${clientId}`);
 
   ws.onopen = () => {
     console.log("✅ Conectado al chat:", clientId);

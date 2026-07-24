@@ -2272,7 +2272,7 @@ function mostrarSugerencias(code) {
     btn.disabled = true;
     btn.textContent = "⏳";
     try {
-      const resp = await fetch("http://136.65.1.251:8000/api/descargar-consultas-fallidas/excel", {
+      const resp = await fetch("https://advocate-usage-contribution-picnic.trycloudflare.com/api/descargar-consultas-fallidas/excel", {
         method: "GET"
       });
 

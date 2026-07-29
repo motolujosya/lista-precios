@@ -270,6 +270,24 @@
     gap: 4px;
   }
 
+  /* 🔐 Elementos visibles solo para el administrador logueado */
+  .admin-only { display: none !important; }
+  body.is-admin .admin-only { display: flex !important; }
+  /* Variante para elementos que NO deben forzarse a flex (divs normales, <option>, filas) */
+  .admin-only-block { display: none !important; }
+  body.is-admin .admin-only-block { display: revert !important; }
+
+  #adminLoginModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 4000; }
+  #adminLoginModal.open { display: flex; }
+  #adminLoginContent { background: #fff; border-radius: 10px; padding: 22px; width: 90%; max-width: 320px; text-align: center; }
+  #adminLoginContent h3 { margin: 0 0 14px 0; font-size: 16px; }
+  #adminLoginContent input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; box-sizing: border-box; margin-bottom: 10px; }
+  #adminLoginContent .admin-login-actions { display: flex; gap: 8px; }
+  #adminLoginContent .admin-login-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  #adminLoginContent .admin-login-actions button:first-child { background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; }
+  #adminLoginContent .admin-login-actions button:last-child { background: #eee; color: #333; }
+  #adminLoginError { color: #c0392b; font-size: 12px; min-height: 16px; margin-bottom: 6px; }
+
   .cart-action-label {
     display: none;
     font-size: 9px;
@@ -949,9 +967,10 @@
 <div class="search-bar">
   <input id="search" placeholder="Buscar por nombre o info..." oninput="filterProducts()">
   <button id="viewToggleBtn" onclick="toggleView()"></button>
+  <button id="adminLoginBtn" class="icon-btn" onclick="abrirLoginAdmin()" data-tooltip="Acceso administrador" aria-label="Acceso administrador">🔐</button>
 </div>
 <div class="tool-bar">
-  <div class="tool-bar-item">
+  <div class="tool-bar-item admin-only">
     <button class="icon-btn" data-tooltip="Ver historial de ventas" onclick="verHistorial()" aria-label="Ver historial de ventas">📋</button>
     <span class="tool-bar-label">Historial</span>
   </div>
@@ -959,7 +978,7 @@
     <button class="icon-btn" data-tooltip="Pedidos guardados" onclick="abrirPedidosGuardados()" aria-label="Pedidos guardados">📁</button>
     <span class="tool-bar-label">Pedidos</span>
   </div>
-  <div class="tool-bar-item">
+  <div class="tool-bar-item admin-only">
     <button class="icon-btn" data-tooltip="Buscar recibos" onclick="abrirBuscarRecibos()" aria-label="Buscar recibos">🔎</button>
     <span class="tool-bar-label">Recibos</span>
   </div>
@@ -993,7 +1012,7 @@
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
 
   <!-- Ajustar total del carrito: por porcentaje de descuento o valor manual -->
-  <div id="descuentoCarrito" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+  <div id="descuentoCarrito" class="admin-only-block" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
     <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">💲 Ajustar total del carrito</div>
 
     <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
@@ -1015,7 +1034,7 @@
   </div>
 
   <!-- Datos del cliente para el recibo -->
-  <div id="datosCliente" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+  <div id="datosCliente" class="admin-only-block" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
     <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">🧾 Datos del cliente</div>
     <div style="position: relative;">
       <input id="clienteNombre" placeholder="Nombre del cliente" autocomplete="off"
@@ -1037,7 +1056,7 @@
     </select>
   </div>
   <!-- NUEVO: Calculadora de cambio -->
-  <div id="pagoCalculadora" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+  <div id="pagoCalculadora" class="admin-only-block" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
       <label for="pagoCliente" style="font-size: 13px; font-weight: bold; color: #555;">Paga con:</label>
       <input id="pagoCliente" type="number" placeholder="0" style="width: 120px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; text-align: right;">
@@ -1068,7 +1087,7 @@
       <button id="clearCartBtn" class="icon-btn icon-btn--destructive" data-tooltip="Vaciar carrito" aria-label="Vaciar carrito">🗑️</button>
       <span class="cart-action-label">Vaciar</span>
     </div>
-    <div class="cart-action-item">
+    <div class="cart-action-item admin-only">
       <button id="checkoutBtn" class="icon-btn" data-tooltip="Finalizar compra" aria-label="Finalizar compra">✅</button>
       <span class="cart-action-label">Finalizar</span>
     </div>
@@ -1076,7 +1095,7 @@
       <button id="btnConectarUSB" class="icon-btn" onclick="conectarImpresoraUSB()" data-tooltip="Conectar impresora térmica por USB" aria-label="Conectar impresora USB">🔌</button>
       <span class="cart-action-label">Conectar USB</span>
     </div>
-    <div class="cart-action-item">
+    <div class="cart-action-item admin-only">
       <button id="descargarConsultasFallidasBtn" class="icon-btn" data-tooltip="Descargar consultas fallidas" aria-label="Descargar consultas fallidas">🔍❓</button>
       <span class="cart-action-label">Fallidas</span>
     </div>
@@ -1106,6 +1125,38 @@
 </div>
 
 <!-- Modal Buscar Recibos -->
+<div id="adminLoginModal">
+  <div id="adminLoginContent">
+    <div id="adminLoginView">
+      <h3>🔐 Acceso administrador</h3>
+      <div id="adminLoginError"></div>
+      <input type="password" id="adminLoginPassword" placeholder="Contraseña" autocomplete="off">
+      <div class="admin-login-actions">
+        <button onclick="confirmarLoginAdmin()">Ingresar</button>
+        <button onclick="cerrarLoginAdmin()">Cancelar</button>
+      </div>
+    </div>
+    <div id="adminMenuView" style="display:none;">
+      <h3>🔓 Sesión de administrador</h3>
+      <div class="admin-login-actions" style="flex-direction:column;">
+        <button onclick="mostrarCambiarPassword()">Cambiar contraseña</button>
+        <button onclick="cerrarSesionAdmin()">Cerrar sesión</button>
+        <button onclick="cerrarLoginAdmin()">Cancelar</button>
+      </div>
+    </div>
+    <div id="adminChangePasswordView" style="display:none;">
+      <h3>🔑 Cambiar contraseña</h3>
+      <div id="adminChangeError"></div>
+      <input type="password" id="adminOldPassword" placeholder="Contraseña actual" autocomplete="off">
+      <input type="password" id="adminNewPassword" placeholder="Nueva contraseña" autocomplete="off">
+      <input type="password" id="adminNewPassword2" placeholder="Confirmar nueva contraseña" autocomplete="off">
+      <div class="admin-login-actions">
+        <button onclick="confirmarCambioPassword()">Guardar</button>
+        <button onclick="cerrarLoginAdmin()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="buscarRecibosModal">
   <div id="buscarRecibosContent">
     <button class="close-quotes" onclick="document.getElementById('buscarRecibosModal').style.display='none'">✖ Cerrar</button>
@@ -1388,6 +1439,9 @@
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
+      // Para el personal sin login solo debe verse el aviso de "Sin stock";
+      // la cantidad disponible (bajo stock / en stock) es información solo para admin.
+      const stockOculto = stock !== 0;
       const imgUrl = githubRaw(foto);
       const imgHtml = foto
         ? `<img src="${imgUrl}" alt="" class="mini-foto" onclick="abrirLightbox(this.src)">`
@@ -1402,18 +1456,18 @@
           <p style="color:#888; font-size:13px; margin: 2px 0 6px 0;"><em>${marca}</em></p>
           <p><strong>Código:</strong> ${code || "—"}</p>
           <p>${info || ""}</p>
-          <p class="${stockClass}">${stockLabel}</p>
+          <p class="${stockClass}${stockOculto ? " admin-only-block" : ""}">${stockLabel}</p>
         </div>
         <div class="card-actions">
           <select>
             <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
-            <option value="${priceDesc}">Precio Taller: ${formatCurrency(priceDesc)}</option>
+            <option value="${priceDesc}" class="admin-only-block">Precio Taller: ${formatCurrency(priceDesc)}</option>
           </select>
           <div class="card-actions-buttons">
             <button class="add-btn" ${stock === 0 ? "disabled" : ""}>Agregar</button>
             <button class="copy-btn">Copiar</button>
           </div>
-          ${link ? `<p><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
+          ${link ? `<p class="admin-only-block"><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
         </div>
       `;
 
@@ -2309,6 +2363,130 @@ function mostrarSugerencias(code) {
     }
   };
 
+  // 🔐 Login de administrador
+  // IMPORTANTE: esto es solo un filtro de interfaz para ocultar botones al
+  // personal; NO protege datos reales (ver conversación sobre seguridad).
+  // Contraseña por defecto: "admin2026". Se puede cambiar desde la propia
+  // app (botón 🔓 → "Cambiar contraseña") una vez logueado como admin; el
+  // nuevo hash queda guardado en localStorage de ESTE navegador/dispositivo
+  // únicamente (no se sincroniza entre dispositivos).
+  //
+  // ¿Olvidaste la contraseña? Como no hay servidor de por medio, no existe
+  // recuperación automática. Opciones:
+  //  1) Si nunca la cambiaste desde la app, sigue siendo "admin2026".
+  //  2) Si la cambiaste y la olvidaste, abre las herramientas de
+  //     desarrollador del navegador (F12) → pestaña "Application"/"Almacenamiento"
+  //     → Local Storage → borra la clave "adminPasswordHashOverride".
+  //     Eso restaura la contraseña por defecto ("admin2026").
+  const ADMIN_PASSWORD_HASH = "6051fc84a7a0d74c225fb18a496b09952da5642e60723ecae543298edd7d82d6";
+
+  async function sha256Hex(texto) {
+    const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function getPasswordHash() {
+    return localStorage.getItem("adminPasswordHashOverride") || ADMIN_PASSWORD_HASH;
+  }
+
+  function isAdmin() {
+    return sessionStorage.getItem("esAdmin") === "true";
+  }
+
+  function aplicarEstadoAdmin() {
+    document.body.classList.toggle("is-admin", isAdmin());
+    const btn = document.getElementById("adminLoginBtn");
+    if (btn) {
+      btn.textContent = isAdmin() ? "🔓" : "🔐";
+      btn.setAttribute("data-tooltip", isAdmin() ? "Sesión de administrador" : "Acceso administrador");
+    }
+    if (typeof actualizarVisibilidadBotonUSB === "function") actualizarVisibilidadBotonUSB();
+  }
+
+  function mostrarVistaAdmin(vista) {
+    document.getElementById("adminLoginView").style.display = vista === "login" ? "block" : "none";
+    document.getElementById("adminMenuView").style.display = vista === "menu" ? "block" : "none";
+    document.getElementById("adminChangePasswordView").style.display = vista === "cambiar" ? "block" : "none";
+  }
+
+  function abrirLoginAdmin() {
+    document.getElementById("adminLoginModal").classList.add("open");
+    if (isAdmin()) {
+      mostrarVistaAdmin("menu");
+      return;
+    }
+    document.getElementById("adminLoginError").textContent = "";
+    document.getElementById("adminLoginPassword").value = "";
+    mostrarVistaAdmin("login");
+    setTimeout(() => document.getElementById("adminLoginPassword").focus(), 50);
+  }
+
+  function cerrarLoginAdmin() {
+    document.getElementById("adminLoginModal").classList.remove("open");
+  }
+
+  function cerrarSesionAdmin() {
+    sessionStorage.removeItem("esAdmin");
+    aplicarEstadoAdmin();
+    cerrarLoginAdmin();
+    showToast("🔒 Sesión de administrador cerrada.");
+  }
+
+  async function confirmarLoginAdmin() {
+    const valor = document.getElementById("adminLoginPassword").value;
+    const hash = await sha256Hex(valor);
+    if (hash === getPasswordHash()) {
+      sessionStorage.setItem("esAdmin", "true");
+      cerrarLoginAdmin();
+      aplicarEstadoAdmin();
+      showToast("✅ Acceso de administrador activado.");
+    } else {
+      document.getElementById("adminLoginError").textContent = "Contraseña incorrecta.";
+    }
+  }
+
+  function mostrarCambiarPassword() {
+    document.getElementById("adminChangeError").textContent = "";
+    document.getElementById("adminOldPassword").value = "";
+    document.getElementById("adminNewPassword").value = "";
+    document.getElementById("adminNewPassword2").value = "";
+    mostrarVistaAdmin("cambiar");
+  }
+
+  async function confirmarCambioPassword() {
+    const actual = document.getElementById("adminOldPassword").value;
+    const nueva = document.getElementById("adminNewPassword").value;
+    const nueva2 = document.getElementById("adminNewPassword2").value;
+    const errorDiv = document.getElementById("adminChangeError");
+
+    const hashActual = await sha256Hex(actual);
+    if (hashActual !== getPasswordHash()) {
+      errorDiv.textContent = "La contraseña actual no es correcta.";
+      return;
+    }
+    if (nueva.length < 4) {
+      errorDiv.textContent = "La nueva contraseña debe tener al menos 4 caracteres.";
+      return;
+    }
+    if (nueva !== nueva2) {
+      errorDiv.textContent = "Las contraseñas nuevas no coinciden.";
+      return;
+    }
+    const nuevoHash = await sha256Hex(nueva);
+    localStorage.setItem("adminPasswordHashOverride", nuevoHash);
+    cerrarLoginAdmin();
+    showToast("✅ Contraseña actualizada en este dispositivo.");
+  }
+
+  document.getElementById("adminLoginPassword").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") confirmarLoginAdmin();
+  });
+  document.getElementById("adminLoginModal").addEventListener("click", (e) => {
+    if (e.target.id === "adminLoginModal") cerrarLoginAdmin();
+  });
+
+  aplicarEstadoAdmin(); // restaurar estado de admin guardado en esta pestaña
+
   document.getElementById("clearCartBtn").onclick = () => {
     if (cart.length === 0) return showToast("El carrito ya está vacío.");
     if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
@@ -2385,6 +2563,10 @@ function mostrarSugerencias(code) {
   function actualizarVisibilidadBotonUSB() {
     const wrapper = document.getElementById("btnConectarUSBWrapper");
     if (!wrapper) return;
+    if (!isAdmin()) {
+      wrapper.style.display = "none"; // solo visible para el administrador logueado
+      return;
+    }
     if (dispositivoUSB) {
       wrapper.style.display = "none";
       return;
@@ -3454,14 +3636,14 @@ function agregarTarjetaProducto(p) {
     </span>
   </div>
   ${p.precio_taller ? `
-  <div class="cp-row">
+  <div class="cp-row admin-only">
     <span>Precio taller</span>
     <span style="display:flex;align-items:center;gap:6px;">
       <span class="cp-precio-taller">$${precioTallerFormateado}</span>
       <button class="cp-add-btn cp-add-taller" data-precio="${precioTallerNum}" ${stock === 0 ? "disabled" : ""}>+ Agregar</button>
     </span>
   </div>` : ""}
-  <div class="cp-row"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
+  <div class="cp-row${stock === 0 ? "" : " admin-only"}"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
   ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
 `;
 

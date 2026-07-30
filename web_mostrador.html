@@ -1324,6 +1324,24 @@
   let cart = [];
   let productosData = []; // guarda referencia a todos los productos renderizados
 
+  // 🔧 Variables de estado consolidadas aquí arriba (antes se declaraban más
+  // abajo en el archivo). Si algo en el resto del script fallaba antes de
+  // llegar a esas líneas, quedaban en "zona muerta temporal" (TDZ) y
+  // funciones como verHistorial() o mostrarRecibo() tiraban un
+  // ReferenceError permanente al usarlas. Declararlas aquí, de primero,
+  // evita ese problema por completo.
+  let ultimosRecibosBuscados = [];
+  let devolucionContexto = null;
+  let ultimoReciboData = null;
+  let dispositivoUSB = null;
+  let endpointSalidaUSB = null;
+  let clientesCache = null;
+  let historialRowsCache = null;
+  let typingBubble = null;
+  let ws = null;
+  let wsReconectando = false;
+  let pingInterval = null;
+
   // 💲 Ajuste de total del carrito (descuento % o total manual)
   // type: "none" | "percent" | "manual"
   let cartAdjustment = { type: "none", value: 0 };
@@ -1963,8 +1981,6 @@ function mostrarSugerencias(code) {
     document.getElementById("resultadosRecibos").innerHTML = `<p style="text-align:center; color:#888;">Usa los filtros y presiona "Buscar".</p>`;
   }
 
-  let ultimosRecibosBuscados = [];
-
   async function buscarRecibos() {
     const cont = document.getElementById("resultadosRecibos");
     cont.innerHTML = `<p style="text-align:center; color:#888;">Buscando...</p>`;
@@ -2037,7 +2053,6 @@ function mostrarSugerencias(code) {
   }
 
   // ↩️ Registrar devolución (parcial, por producto, sin borrar nada)
-  let devolucionContexto = null;
 
   function abrirDevolucion(r) {
     let items = [];
@@ -2543,8 +2558,6 @@ function mostrarSugerencias(code) {
     }
   }
 
-  let ultimoReciboData = null;
-
   // ============================================================
   // 🔌🖨️ IMPRESIÓN DIRECTA POR USB (ESC/POS) — alternativa opcional
   // ============================================================
@@ -2572,9 +2585,6 @@ function mostrarSugerencias(code) {
   //    queda dedicada a esta web mientras tenga ese driver.
   // 3. La primera vez que uses el botón "Imprimir por USB", el navegador
   //    te va a pedir elegir el dispositivo de una lista (permiso único).
-
-  let dispositivoUSB = null;
-  let endpointSalidaUSB = null;
 
   // 👁️ Muestra el botón "Conectar USB" del carrito SOLO si todavía no hay
   // ninguna impresora vinculada; si ya se conectó una vez (y el navegador
@@ -3121,7 +3131,6 @@ function mostrarSugerencias(code) {
   }
 
   // 👤 Autocompletar clientes guardados (hoja "Clientes")
-  let clientesCache = null;
   let clientesCacheTime = 0;
 
   async function obtenerClientesCache() {
@@ -3327,8 +3336,6 @@ function parseFechaSheet(val) {
   return val.toString();
 }
 
-
-  let historialRowsCache = null;
 
   function formatFechaISO(d) {
     const y = d.getFullYear();
@@ -3539,12 +3546,6 @@ const chatSendBtn = document.getElementById("chatSendBtn");
 
 // Identificador único para esta sesión de chat
 const clientId = crypto.randomUUID();
-
-// Burbuja "escribiendo..." que se actualiza/elimina dinámicamente
-let typingBubble = null;
-let ws = null;
-let wsReconectando = false;
-let pingInterval = null;
 
 function conectarWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;

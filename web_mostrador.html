@@ -1958,6 +1958,8 @@ function mostrarSugerencias(code) {
     document.getElementById("resultadosRecibos").innerHTML = `<p style="text-align:center; color:#888;">Usa los filtros y presiona "Buscar".</p>`;
   }
 
+  let ultimosRecibosBuscados = [];
+
   async function buscarRecibos() {
     const cont = document.getElementById("resultadosRecibos");
     cont.innerHTML = `<p style="text-align:center; color:#888;">Buscando...</p>`;
@@ -1992,7 +1994,12 @@ function mostrarSugerencias(code) {
         return;
       }
 
-      cont.innerHTML = [...rows].reverse().map(r => {
+      // Guardamos los recibos encontrados en una variable para no tener que
+      // incrustar el JSON directamente en el HTML (eso rompía el botón "Ver"
+      // si algún dato del recibo traía comillas, saltos de línea, etc.)
+      ultimosRecibosBuscados = [...rows].reverse();
+
+      cont.innerHTML = ultimosRecibosBuscados.map((r, idx) => {
         const esDevolucion = r[11] === "Devolucion";
         const badge = esDevolucion
           ? `<span class="badge-devolucion">↩️ Devolución</span>`
@@ -2004,12 +2011,19 @@ function mostrarSugerencias(code) {
             <span>${r[1]} · ${formatCurrency(parseFloat(r[7]) || 0)} · ${r[5] || "—"}</span>
           </div>
           <div class="rr-botones">
-            <button onclick='reimprimirRecibo(${JSON.stringify(r).replace(/'/g, "&apos;")})'>👁️ Ver</button>
-            ${!esDevolucion ? `<button class="btn-devolver" onclick='abrirDevolucion(${JSON.stringify(r).replace(/'/g, "&apos;")})'>↩️ Devolución</button>` : ""}
+            <button class="btn-ver-recibo" data-idx="${idx}">👁️ Ver</button>
+            ${!esDevolucion ? `<button class="btn-devolver" data-idx="${idx}">↩️ Devolución</button>` : ""}
           </div>
         </div>
       `;
       }).join("");
+
+      cont.querySelectorAll(".btn-ver-recibo").forEach(btn => {
+        btn.onclick = () => reimprimirRecibo(ultimosRecibosBuscados[Number(btn.dataset.idx)]);
+      });
+      cont.querySelectorAll(".btn-devolver").forEach(btn => {
+        btn.onclick = () => abrirDevolucion(ultimosRecibosBuscados[Number(btn.dataset.idx)]);
+      });
 
     } catch (e) {
       console.error(e);
@@ -3698,7 +3712,6 @@ chatInput.addEventListener("keydown", (e) => {
     enviarMensaje();
   }
 });
-
 
 </script>
 </body>

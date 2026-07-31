@@ -1843,9 +1843,24 @@ function sincronizarItemConCatalogo(item) {
 // que ya tengas en el carrito (o que cargues desde "Pedidos guardados")
 // reflejan el cambio en vez de quedarse con una foto vieja.
 function sincronizarCarritoConCatalogo() {
-  if (!cart.length) return;
+  if (!cart.length || !productosData.length) return;
+
+  // 🚫 Igual que al cargar un pedido guardado: si mientras el producto
+  // está en el carrito activo alguien le cambia el código en el catálogo,
+  // ya no hay forma de identificarlo como el mismo producto. Lo sacamos
+  // del carrito (en vez de dejarlo con datos viejos) para no permitir una
+  // venta que luego fallaría al registrarse.
+  const itemsInvalidos = cart.filter(item => item.code && !productosData.some(p => p.code === item.code));
+  if (itemsInvalidos.length > 0) {
+    cart = cart.filter(item => !itemsInvalidos.includes(item));
+    const listado = itemsInvalidos.map(it => `• ${it.name || it.label || "Producto"} (código: ${it.code})`).join("\n");
+    alert(
+      `⚠️ Atención: ${itemsInvalidos.length} producto(s) se quitaron del carrito porque su código ya no coincide con ningún producto del catálogo actual (probablemente se le cambió el código a ese producto):\n\n${listado}\n\nBúscalos de nuevo por nombre y agrégalos con su código actual.`
+    );
+  }
+
   const huboCambios = cart.map(sincronizarItemConCatalogo).some(Boolean);
-  if (huboCambios) updateCartDisplay();
+  if (huboCambios || itemsInvalidos.length > 0) updateCartDisplay();
 }
 
 function mostrarSugerencias(code) {
@@ -2313,7 +2328,35 @@ function mostrarSugerencias(code) {
       if (!confirm("Esto reemplazará el carrito actual por el pedido guardado. ¿Continuar?")) return;
     }
 
-    cart = JSON.parse(JSON.stringify(quote.items));
+    const itemsGuardados = JSON.parse(JSON.stringify(quote.items));
+
+    // 🚫 Si el catálogo aún no ha terminado de cargar en esta pestaña, NO
+    // podemos verificar códigos con confianza (productosData estaría vacío
+    // y rechazaríamos TODO por error). En ese caso, cargamos tal cual y
+    // avisamos para que se revise cuando el catálogo esté listo.
+    if (!productosData.length) {
+      cart = itemsGuardados;
+      updateCartDisplay();
+      document.getElementById("quotesModal").style.display = "none";
+      cartPanel.classList.add("open");
+      showToast("⏳ El catálogo aún está cargando: no se pudo verificar si los códigos siguen vigentes. Revísalo en unos segundos.");
+      return;
+    }
+
+    // 🔎 Separamos los productos cuyo código YA NO EXISTE en el catálogo
+    // actual (por ejemplo, porque alguien le cambió el código al producto
+    // después de guardar el pedido). Si los dejáramos pasar, se verían en
+    // el carrito con datos "congelados" pero la venta fallaría al
+    // finalizar porque el código no corresponde a nada real.
+    const itemsValidos = [];
+    const itemsRechazados = [];
+    itemsGuardados.forEach(item => {
+      if (!item.code) { itemsValidos.push(item); return; } // ítems manuales sin código propio
+      const existeEnCatalogo = productosData.some(p => p.code === item.code);
+      (existeEnCatalogo ? itemsValidos : itemsRechazados).push(item);
+    });
+
+    cart = itemsValidos;
 
     // 💲 Actualiza cada producto con los datos VIGENTES del catálogo
     // (nombre, info y precio según la tarifa público/taller elegida),
@@ -2342,6 +2385,16 @@ function mostrarSugerencias(code) {
     updateCartDisplay();
     document.getElementById("quotesModal").style.display = "none";
     cartPanel.classList.add("open");
+
+    if (itemsRechazados.length > 0) {
+      const listado = itemsRechazados
+        .map(it => `• ${it.name || it.label || "Producto"}  (código guardado: ${it.code})`)
+        .join("\n");
+      alert(
+        `⚠️ Atención: ${itemsRechazados.length} producto(s) del pedido "${quote.nombre}" NO se agregaron al carrito porque su código ya no coincide con ningún producto del catálogo actual (probablemente se le cambió el código a ese producto):\n\n${listado}\n\nBúscalos de nuevo por nombre y agrégalos manualmente con su código actual.`
+      );
+    }
+
     showToast(preciosActualizados > 0
       ? `📥 Pedido "${quote.nombre}" cargado. Se actualizaron ${preciosActualizados} producto(s) con los datos vigentes del catálogo.`
       : `📥 Pedido "${quote.nombre}" cargado en el carrito.`);

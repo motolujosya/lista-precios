@@ -985,7 +985,6 @@
 <div class="search-bar">
   <input id="search" placeholder="Buscar por nombre o info..." oninput="filterProductsDebounced()">
   <button id="viewToggleBtn" onclick="toggleView()"></button>
-  <button id="adminLoginBtn" class="icon-btn" onclick="abrirLoginAdmin()" data-tooltip="Acceso administrador" aria-label="Acceso administrador">🔐</button>
 </div>
 <div class="tool-bar">
   <div class="tool-bar-item admin-only">
@@ -1006,6 +1005,7 @@
   </div>
 </div>
 <div class="float-actions">
+  <div id="adminLoginBtn" class="float-btn" onclick="abrirLoginAdmin()" data-tooltip="Acceso administrador" aria-label="Acceso administrador" role="button" tabindex="0">🔐</div>
   <div id="cartIcon" class="float-btn" data-tooltip="Carrito" aria-label="Carrito" role="button" tabindex="0">🛒<span id="cartCount">0</span></div>
   <div id="chatFloatBtn" class="float-btn" data-tooltip="Asistente" onclick="toggleChat()" aria-label="Asistente" role="button" tabindex="0">🤖</div>
 </div>

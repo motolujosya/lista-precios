@@ -246,12 +246,12 @@
     color: #444;
   }
 
-  .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box; }
+  .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
   .cart-panel.open { transform: translateX(0); }
   @media (max-width: 420px) {
-    /* En celulares angostos, el carrito ocupa toda la pantalla en vez de
-       desbordarse a los costados con un ancho fijo de escritorio. */
-    .cart-panel { width: 100vw; }
+    /* En celulares angostos, el carrito y el chat ocupan toda la pantalla
+       en vez de desbordarse a los costados con un ancho fijo de escritorio. */
+    .cart-panel, #chatPanel { width: 100vw; }
   }
 
   #cartItems { overflow: visible; }
@@ -838,6 +838,7 @@
   #chatMessages {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -3651,6 +3652,19 @@ const chatPanel = document.getElementById("chatPanel");
 const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
 const chatSendBtn = document.getElementById("chatSendBtn");
+
+// 📱 En celular, hacer scroll dentro del carrito o del chat también movía
+// la página de fondo por debajo (típico problema de "scroll chaining").
+// Mientras cualquiera de los dos paneles esté abierto, bloqueamos el
+// scroll del body; se restaura solo al cerrarlos. Usamos un
+// MutationObserver para que funcione sin importar desde qué botón se
+// abran o cierren los paneles.
+function actualizarBloqueoScrollFondo() {
+  const algunoAbierto = cartPanel.classList.contains("open") || chatPanel.classList.contains("open");
+  document.body.style.overflow = algunoAbierto ? "hidden" : "";
+}
+new MutationObserver(actualizarBloqueoScrollFondo).observe(cartPanel, { attributes: true, attributeFilter: ["class"] });
+new MutationObserver(actualizarBloqueoScrollFondo).observe(chatPanel, { attributes: true, attributeFilter: ["class"] });
 
 // Identificador único para esta sesión de chat
 const clientId = crypto.randomUUID();

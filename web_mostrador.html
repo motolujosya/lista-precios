@@ -2145,7 +2145,12 @@ function mostrarSugerencias(code) {
     const totalOriginal = parseFloat(r[7]) || 0;
     const factorDescuento = subtotalOriginal > 0 ? (totalOriginal / subtotalOriginal) : 1;
 
-    devolucionContexto = { numeroOriginal: (r[0] || "").toString(), items, factorDescuento };
+    devolucionContexto = {
+      numeroOriginal: (r[0] || "").toString(),
+      items,
+      factorDescuento,
+      cliente: { nombre: r[2] || "", cedula: r[3] || "", telefono: r[4] || "" }
+    };
 
     document.getElementById("devolucionInfo").innerHTML =
       `Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""} · ${r[1]}` +
@@ -2203,10 +2208,9 @@ function mostrarSugerencias(code) {
     const motivo = document.getElementById("devolucionMotivo").value.trim();
 
     try {
-      await fetch(APPS_SCRIPT_URL, {
+      const res = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           action: "registrarDevolucion",
           numeroReciboOriginal: numeroOriginal,
@@ -2216,46 +2220,32 @@ function mostrarSugerencias(code) {
         })
       });
 
-      // Como el POST es "no-cors" no podemos leer si el servidor la aceptó
-      // o la rechazó (ej. por intentar devolver más de lo vendido). Se
-      // espera un momento y se confirma consultando "Recibos" directamente.
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const result = await res.json();
 
-      const RECIBOS_NAME = "Recibos";
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(RECIBOS_NAME)}&tqx=out:json&_=${Date.now()}`;
-      const res = await fetch(url);
-      const text = await res.text();
-      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-      const rows = json.table.rows.map(r => r.c.map(c => c ? (c.f || c.v) : ""));
-      const ultima = rows[rows.length - 1];
-
-      const seConfirmo = ultima
-        && ultima[11] === "Devolucion"
-        && (ultima[12] || "").toString() === numeroOriginal.toString();
-
-      if (seConfirmo) {
+      if (!res.ok || !result.ok) {
+        const detalle = (result.errores && result.errores.length)
+          ? result.errores.join("\n")
+          : "Error desconocido del servidor.";
+        alert("⚠️ La devolución fue rechazada:\n\n" + detalle);
+      } else {
         showToast("✅ Devolución registrada e inventario actualizado.");
         document.getElementById("devolucionModal").style.display = "none";
 
-        let itemsDevueltos = [];
-        try { itemsDevueltos = JSON.parse(ultima[10] || "[]"); } catch (e) {}
-
+        const totalDevuelto = itemsADevolver.reduce((s, it) => s + it.qty * it.price, 0);
         mostrarRecibo({
-          numero: ultima[0],
-          fecha: ultima[1],
-          clienteNombre: ultima[2],
-          clienteDoc: ultima[3],
-          clienteTel: ultima[4],
-          formaPago: ultima[5],
-          total: parseFloat(ultima[7]) || 0,
+          numero: result.numeroDevolucion,
+          fecha: new Date().toLocaleString("es-CO"),
+          clienteNombre: devolucionContexto.cliente?.nombre || "",
+          clienteDoc: devolucionContexto.cliente?.cedula || "",
+          clienteTel: devolucionContexto.cliente?.telefono || "",
+          formaPago: motivo ? `Devolución: ${motivo}` : "Devolución",
+          total: -totalDevuelto,
           pagoCon: 0,
           cambio: 0,
-          items: itemsDevueltos,
+          items: itemsADevolver,
           tipo: "Devolucion",
           reciboOriginal: numeroOriginal
         });
-      } else {
-        alert("⚠️ No se pudo confirmar automáticamente la devolución. Es posible que se haya rechazado (por ejemplo, si la cantidad supera lo disponible para devolver). Revisa la hoja \"Recibos\" o el panel de Ejecuciones de Apps Script para confirmar qué pasó.");
       }
 
     } catch (e) {
@@ -3382,24 +3372,36 @@ function mostrarSugerencias(code) {
 
     const response = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(data)
     });
 
-    console.log("✅ Respuesta recibida:", response);
-    console.log("Tipo:", response.type); // con no-cors siempre será "opaque"
+    const result = await response.json();
+    console.log("✅ Respuesta del servidor:", result);
+
+    if (!response.ok || !result.ok) {
+      // ⚠️ La venta NO se registró (o solo se registró PARCIALMENTE: el
+      // backend procesa producto por producto, así que algunos ítems del
+      // carrito pueden haberse vendido bien mientras otros fallan, por
+      // ejemplo por falta de stock). No vaciamos el carrito ni mostramos
+      // éxito — mostramos el detalle exacto que envía el servidor.
+      const detalle = (result.errores && result.errores.length)
+        ? result.errores.join("\n")
+        : "El servidor no confirmó la venta (respuesta inesperada).";
+      alert(
+        "❌ La venta NO se completó correctamente:\n\n" + detalle +
+        "\n\nRevisa \"Historial\" o \"Buscar recibos\" para confirmar qué productos sí quedaron registrados antes de reintentar, para no vender el mismo producto dos veces."
+      );
+      btn.disabled = false;
+      btn.textContent = "✅";
+      btn.setAttribute("data-tooltip", "Finalizar compra");
+      return;
+    }
 
     showToast("✅ ¡Compra finalizada! Inventario actualizado.");
 
-    // Pequeña espera para que la hoja de Google ya refleje el recibo
-    // recién escrito por el servidor antes de consultarlo (mismo patrón
-    // que ya se usaba para recargar el catálogo tras vender).
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    const numeroRecibo = await obtenerUltimoNumeroRecibo();
-
     mostrarRecibo({
-      numero: numeroRecibo,
+      numero: result.numeroRecibo,
       fecha: new Date().toLocaleString(),
       items: JSON.parse(JSON.stringify(cart)),
       subtotal, descuento, total,

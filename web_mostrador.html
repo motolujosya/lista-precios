@@ -2190,7 +2190,11 @@ function mostrarSugerencias(code) {
           // 💲 Se devuelve el precio realmente pagado (precio base con el
           // descuento de la venta ya prorrateado), no el precio base sin
           // descuento, para que el valor devuelto no sea mayor a lo pagado.
-          price: Math.round(item.price * factorDescuento)
+          price: Math.round(item.price * factorDescuento),
+          // 🏷️ Se propaga la tarifa original de la venta (guardada en el
+          // ProductosJSON del recibo), para que la devolución también
+          // quede marcada como Publico/Taller en la hoja "Ventas".
+          tarifa: item.tarifa || null
         });
       }
     });
@@ -3364,7 +3368,11 @@ function mostrarSugerencias(code) {
         name: i.name,
         label: i.label,
         qty: parseInt(i.qty),
-        price: Math.round(parseFloat(i.price))
+        price: Math.round(parseFloat(i.price)),
+        // 🏷️ Con qué tarifa se agregó este producto (publico/taller/null).
+        // Viaja al backend solo como dato interno para la hoja "Ventas";
+        // no se muestra en el carrito, la cotización ni el recibo impreso.
+        tarifa: i.tarifa || null
       }))
     };
 

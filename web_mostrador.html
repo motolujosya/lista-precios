@@ -3035,16 +3035,45 @@ function mostrarSugerencias(code) {
           ctx.drawImage(img, 0, 0, anchoDeseado, alto);
 
           const { data } = ctx.getImageData(0, 0, anchoDeseado, alto);
-          const anchoBytes = anchoDeseado / 8;
-          const bitmap = new Uint8Array(anchoBytes * alto);
 
+          // 1️⃣ Umbral estricto blanco/negro puro (0 o 1, nunca un valor
+          // intermedio) — la impresora térmica solo entiende "hay tinta
+          // aquí" o "no hay tinta aquí", no escalas de grises.
+          const esNegro = new Uint8Array(anchoDeseado * alto);
           for (let y = 0; y < alto; y++) {
             for (let x = 0; x < anchoDeseado; x++) {
               const idx = (y * anchoDeseado + x) * 4;
               const r = data[idx], g = data[idx + 1], b = data[idx + 2];
               const luminancia = 0.299 * r + 0.587 * g + 0.114 * b;
-              const esNegro = luminancia < 150; // umbral de blanco/negro
-              if (esNegro) {
+              esNegro[y * anchoDeseado + x] = luminancia < 150 ? 1 : 0;
+            }
+          }
+
+          // 2️⃣ "Engrosado" (dilatación): un píxel se pinta de negro si él
+          // mismo o alguno de sus vecinos inmediatos ya era negro. Esto
+          // compensa que, al pasar de un logo con bordes suaves/antialiased
+          // a blanco/negro puro, los trazos finos tienden a verse débiles o
+          // cortados en el papel térmico — el mismo efecto que buscarías
+          // con una negrita en el texto, pero aplicado a la imagen.
+          const esNegroEngrosado = new Uint8Array(anchoDeseado * alto);
+          for (let y = 0; y < alto; y++) {
+            for (let x = 0; x < anchoDeseado; x++) {
+              const i = y * anchoDeseado + x;
+              if (esNegro[i]) { esNegroEngrosado[i] = 1; continue; }
+              const arriba = y > 0 && esNegro[i - anchoDeseado];
+              const abajo = y < alto - 1 && esNegro[i + anchoDeseado];
+              const izq = x > 0 && esNegro[i - 1];
+              const der = x < anchoDeseado - 1 && esNegro[i + 1];
+              esNegroEngrosado[i] = (arriba || abajo || izq || der) ? 1 : 0;
+            }
+          }
+
+          const anchoBytes = anchoDeseado / 8;
+          const bitmap = new Uint8Array(anchoBytes * alto);
+
+          for (let y = 0; y < alto; y++) {
+            for (let x = 0; x < anchoDeseado; x++) {
+              if (esNegroEngrosado[y * anchoDeseado + x]) {
                 const byteIdx = y * anchoBytes + (x >> 3);
                 bitmap[byteIdx] |= (0x80 >> (x % 8));
               }

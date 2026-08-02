@@ -548,6 +548,21 @@
   .cliente-sugerencia-item span { font-size: 11px; color: #888; }
 
   /* Modal historial */
+  #inventarioBajoModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2200; }
+  #inventarioBajoContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 560px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  #inventarioBajoContent h4 { margin: 14px 0 6px 0; font-size: 14px; }
+  .inv-bajo-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; background: #f8f9fa; margin-bottom: 6px; }
+  .inv-bajo-row .inv-info { display: flex; flex-direction: column; }
+  .inv-bajo-row .inv-info strong { font-size: 13px; }
+  .inv-bajo-row .inv-info span { font-size: 11px; color: #888; }
+  .inv-bajo-row .inv-cant { font-weight: bold; font-size: 13px; }
+  .inv-bajo-row.sin-stock .inv-cant { color: #dc3545; }
+  .inv-bajo-row.stock-bajo .inv-cant { color: #ff9800; }
+  .inv-filtro-marcas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .inv-chip-marca { border: 1px solid #ccc; background: #fff; color: #555; border-radius: 20px; padding: 5px 12px; font-size: 12px; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+  .inv-chip-marca:hover { border-color: #999; }
+  .inv-chip-marca.activo { background: #333; border-color: #333; color: #fff; }
+
   #historialModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
   #historialContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 700px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
   #historialTable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
@@ -1227,6 +1242,13 @@
 </div>
 
 <!-- Modal Historial -->
+<div id="inventarioBajoModal">
+  <div id="inventarioBajoContent">
+    <button class="close-historial" onclick="document.getElementById('inventarioBajoModal').style.display='none'">✖ Cerrar</button>
+    <h3>📦 Alerta de inventario</h3>
+    <div id="inventarioBajoBody"></div>
+  </div>
+</div>
 <div id="historialModal">
   <div id="historialContent">
     <button class="close-historial" onclick="document.getElementById('historialModal').style.display='none'">✖ Cerrar</button>
@@ -1361,6 +1383,7 @@
   let endpointSalidaUSB = null;
   let clientesCache = null;
   let historialRowsCache = null;
+  let alertaInventarioMostrada = false; // 📦 para que la alerta de inventario solo aparezca una vez por sesión de pestaña
   let typingBubble = null;
   let ws = null;
   let wsReconectando = false;
@@ -1437,6 +1460,7 @@
     renderProducts(cols, rows);
     filterProducts(); // vuelve a aplicar el texto de búsqueda actual sobre las tarjetas recién creadas
     sincronizarCarritoConCatalogo(); // ver definición más abajo (punto 3: mantener el carrito al día con el catálogo)
+    revisarInventarioBajoUnaVez(); // 📦 alerta de stock bajo/agotado, solo la primera vez que carga el catálogo y solo si ya eres admin
 
     window.scrollTo({ top: scrollPrevio, behavior: "instant" });
   };
@@ -1474,6 +1498,14 @@
       const code = obj["codigo"];
       const marca = obj["marca"] || "";
       const stock = parseInt(obj["inventario"]) || 0;
+      // 📦 Umbral personalizado de stock bajo, por producto (columna "Umbral"
+      // en la hoja "Lista"). Si no está definido, se usa un umbral por
+      // defecto de 3 más abajo. Un umbral de -1 significa "no avisar nunca
+      // sobre este producto" (productos que no se piensan reponer pronto).
+      const umbralRaw = obj["umbral"];
+      const umbral = (umbralRaw !== undefined && umbralRaw !== "" && !isNaN(parseInt(umbralRaw)))
+        ? parseInt(umbralRaw)
+        : null;
       const rel1 = obj["relacionado1"] || "";
       const rel2 = obj["relacionado2"] || "";
       const rel3 = obj["relacionado3"] || "";
@@ -1482,7 +1514,7 @@
 
       if (!name) return;
 
-      productosData.push({ name, code, info, stock, price, priceDesc, foto, relacionados });
+      productosData.push({ name, code, info, marca, stock, price, priceDesc, foto, relacionados, umbral });
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
@@ -1710,6 +1742,111 @@
   function filterProductsDebounced() {
     clearTimeout(filterDebounceTimer);
     filterDebounceTimer = setTimeout(filterProducts, 180);
+  }
+
+  // 📦 ALERTA DE INVENTARIO (solo admin)
+  // Se dispara una sola vez por sesión de pestaña (no en cada recarga del
+  // catálogo tras una venta, para no ser invasivo). Usa la columna
+  // "Umbral" de la hoja "Lista" para personalizar por producto a partir de
+  // cuántas unidades se considera "stock bajo"; si un producto no tiene
+  // umbral definido, se usa 3 por defecto. Cualquier umbral negativo (no
+  // solo -1) excluye al
+  // producto de la alerta por completo (ni "sin stock" ni "stock bajo"),
+  // para productos que no se piensan reponer de inmediato.
+  function revisarInventarioBajoUnaVez() {
+    if (alertaInventarioMostrada) return;
+    if (!isAdmin() || !productosData.length) return;
+    alertaInventarioMostrada = true;
+    revisarInventarioBajo();
+  }
+
+  // 📦 Estado de la alerta de inventario, guardado en variables globales
+  // para poder re-filtrar por marca sin tener que recalcular sinStock/stockBajo.
+  let inventarioBajoSinStock = [];
+  let inventarioBajoStockBajo = [];
+  let inventarioBajoMarcasSeleccionadas = new Set(); // vacío = mostrar todas las marcas
+
+  function revisarInventarioBajo() {
+    const sinStock = [];
+    const stockBajo = [];
+
+    productosData.forEach(p => {
+      if (p.umbral !== null && p.umbral < 0) return; // excluido: cualquier umbral negativo, no solo -1
+
+      const umbralEfectivo = (p.umbral !== null && p.umbral !== undefined) ? p.umbral : 3;
+
+      if (p.stock === 0) {
+        sinStock.push(p);
+      } else if (p.stock <= umbralEfectivo) {
+        stockBajo.push(p);
+      }
+    });
+
+    if (sinStock.length === 0 && stockBajo.length === 0) return; // todo en orden, no se muestra nada
+
+    inventarioBajoSinStock = sinStock;
+    inventarioBajoStockBajo = stockBajo;
+    inventarioBajoMarcasSeleccionadas = new Set(); // al abrir, sin filtro (se ven todas)
+
+    renderInventarioBajo();
+    document.getElementById("inventarioBajoModal").style.display = "flex";
+  }
+
+  function toggleFiltroMarcaInventario(marca) {
+    if (inventarioBajoMarcasSeleccionadas.has(marca)) {
+      inventarioBajoMarcasSeleccionadas.delete(marca);
+    } else {
+      inventarioBajoMarcasSeleccionadas.add(marca);
+    }
+    renderInventarioBajo();
+  }
+
+  function renderInventarioBajo() {
+    const todos = [...inventarioBajoSinStock, ...inventarioBajoStockBajo];
+
+    // 🏷️ Marcas disponibles entre los productos en alerta (sin duplicados,
+    // ordenadas alfabéticamente), para armar los chips de filtro.
+    const marcasDisponibles = [...new Set(todos.map(p => p.marca).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+
+    const hayFiltroActivo = inventarioBajoMarcasSeleccionadas.size > 0;
+    const pasaFiltro = p => !hayFiltroActivo || inventarioBajoMarcasSeleccionadas.has(p.marca);
+
+    const sinStock = inventarioBajoSinStock.filter(pasaFiltro);
+    const stockBajo = inventarioBajoStockBajo.filter(pasaFiltro);
+
+    const filaHtml = (p, tipo) => `
+      <div class="inv-bajo-row ${tipo === "sin" ? "sin-stock" : "stock-bajo"}">
+        <div class="inv-info">
+          <strong>${p.name}</strong>
+          <span>Código: ${p.code || "—"}${p.marca ? ` · ${p.marca}` : ""}</span>
+          ${p.info ? `<span>${p.info}</span>` : ""}
+        </div>
+        <div class="inv-cant">${tipo === "sin" ? "Sin stock" : `${p.stock} unidad(es)`}</div>
+      </div>`;
+
+    let html = "";
+
+    if (marcasDisponibles.length > 1) {
+      html += `<div class="inv-filtro-marcas">` + marcasDisponibles.map(m => `
+        <button
+          class="inv-chip-marca ${inventarioBajoMarcasSeleccionadas.has(m) ? "activo" : ""}"
+          onclick="toggleFiltroMarcaInventario('${m.replace(/'/g, "\\'")}')"
+        >${m}</button>
+      `).join("") + `</div>`;
+    }
+
+    if (sinStock.length > 0) {
+      html += `<h4>❌ Sin stock (${sinStock.length})</h4>` + sinStock.map(p => filaHtml(p, "sin")).join("");
+    }
+    if (stockBajo.length > 0) {
+      html += `<h4>⚠️ Stock bajo (${stockBajo.length})</h4>` + stockBajo.map(p => filaHtml(p, "bajo")).join("");
+    }
+    if (sinStock.length === 0 && stockBajo.length === 0) {
+      html += `<p style="text-align:center; color:#888; padding:20px 0;">No hay productos en alerta con la(s) marca(s) seleccionada(s).</p>`;
+    }
+
+    document.getElementById("inventarioBajoBody").innerHTML = html;
   }
 
   // 🔀 Vista de catálogo (cuadrícula / lista)
@@ -2577,6 +2714,7 @@ function mostrarSugerencias(code) {
       cerrarLoginAdmin();
       aplicarEstadoAdmin();
       showToast("✅ Acceso de administrador activado.");
+      revisarInventarioBajoUnaVez();
     } else {
       document.getElementById("adminLoginError").textContent = "Contraseña incorrecta.";
     }

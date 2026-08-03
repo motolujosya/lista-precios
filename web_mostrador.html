@@ -44,6 +44,10 @@
   .stock-low { color: #ff9800; font-weight: bold; font-size: 13px; }
   .stock-out { color: #dc3545; font-weight: bold; font-size: 13px; }
 
+  /* 📝 Nota interna por producto (columna "Notas" en la hoja "Lista").
+     Solo visible para admin, mismo patrón que .admin-only-block. */
+  .product-note { background: #fff8dc; border: 1px solid #f0e0a0; border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 12.5px; color: #6b5b00; line-height: 1.35; }
+
   .add-btn { background: #ffffff; color: #009e87; border: 1.5px solid #00b09b; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: transform 0.2s, background 0.2s; }
   .add-btn:hover { background: #eafaf7; transform: scale(1.05); }
   .add-btn:disabled { background: #f0f0f0; color: #999; border-color: #ccc; cursor: not-allowed; }
@@ -1542,10 +1546,14 @@
       const rel3 = obj["relacionado3"] || "";
       const rel4 = obj["relacionado4"] || "";
       const relacionados = [rel1, rel2, rel3, rel4].filter(Boolean);
+      // 📝 Nota interna por producto (columna "Notas" en la hoja "Lista").
+      // Solo la ve el administrador logueado, nunca el cliente ni el personal
+      // sin login (mismo criterio que "Precio Taller" o "Ver más").
+      const nota = (obj["notas"] || "").toString().trim();
 
       if (!name) return;
 
-      productosData.push({ name, code, info, marca, stock, price, priceDesc, foto, relacionados, umbral });
+      productosData.push({ name, code, info, marca, stock, price, priceDesc, foto, relacionados, umbral, nota });
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
@@ -1566,6 +1574,7 @@
           <p style="color:#888; font-size:13px; margin: 2px 0 6px 0;"><em>${marca}</em></p>
           <p><strong>Código:</strong> ${code || "—"}</p>
           <p>${info || ""}</p>
+          ${nota ? `<p class="product-note admin-only-block">📝 ${nota}</p>` : ""}
           <p class="${stockClass}${stockOculto ? " admin-only-block" : ""}">${stockLabel}</p>
         </div>
         <div class="card-actions">

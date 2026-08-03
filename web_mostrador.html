@@ -1382,7 +1382,11 @@
   const NEGOCIO = {
     nombre: "Moto Ya!",
     nit: "C.C./NIT: 1.121.883.884-2",
-    direccion: "Cra 21 #14-89 — Acacias al lado del Interrapidisimo",
+    direccion: "Cra 21 #14-89 — Acacias",
+    // 📍 Se imprime en su PROPIA línea, debajo de "direccion" (tanto en el
+    // recibo en pantalla como en la impresión térmica). Si no lo necesitas,
+    // déjalo como cadena vacía "" y simplemente no se imprime esa línea.
+    direccionExtra: "al lado del Interrapidísimo",
     telefono: "Tel: 314 258 9098",
     // 👉 Número de WhatsApp para el QR del recibo/cotización, en formato
     // internacional SIN espacios, signos ni el "+" (código de país + número).
@@ -3251,16 +3255,18 @@ function mostrarSugerencias(code) {
     }
 
     alinear(1);
-    doble(true); negrita(true);
-    texto(esDevolucion ? "NOTA DE DEVOLUCIÓN" : NEGOCIO.nombre);
-    doble(false); negrita(false);
-    if (esDevolucion) texto(NEGOCIO.nombre);
+    if (esDevolucion) {
+      doble(true); negrita(true);
+      texto("NOTA DE DEVOLUCIÓN");
+      doble(false); negrita(false);
+    }
     if (esCotizacion) { negrita(true); texto("COTIZACIÓN"); negrita(false); }
     texto(NEGOCIO.nit);
     // La dirección y el teléfono pueden ser más largos que el ancho del
     // papel — los partimos en varias líneas centradas en vez de dejar
     // que la propia impresora los corte a la mitad de una palabra.
     textoLargoCentrado(NEGOCIO.direccion);
+    if (NEGOCIO.direccionExtra) textoLargoCentrado(NEGOCIO.direccionExtra);
     textoLargoCentrado(NEGOCIO.telefono);
 
     alinear(0);
@@ -3390,15 +3396,14 @@ function mostrarSugerencias(code) {
       </tr>
     `).join("");
 
-    let titulo = NEGOCIO.nombre;
+    let titulo = ""; // el logo ya muestra "Moto Ya", así que ya no se repite como texto aparte
     if (esDevolucion) titulo = "↩️ NOTA DE DEVOLUCIÓN";
 
     document.getElementById("reciboPrint").innerHTML = `
       <img src="data:image/png;base64,${LOGO_RECIBO_BASE64}" alt="${NEGOCIO.nombre}" class="recibo-logo">
-      <h3>${titulo}</h3>
-      ${esDevolucion ? `<div class="recibo-sub">${NEGOCIO.nombre}</div>` : ""}
+      ${titulo ? `<h3>${titulo}</h3>` : ""}
       ${esCotizacion ? `<div class="recibo-sub"><strong>🧾 COTIZACIÓN</strong></div>` : ""}
-      <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}<br>${NEGOCIO.telefono}</div>
+      <div class="recibo-sub">${NEGOCIO.nit}<br>${NEGOCIO.direccion}${NEGOCIO.direccionExtra ? `<br>${NEGOCIO.direccionExtra}` : ""}<br>${NEGOCIO.telefono}</div>
       <div class="recibo-linea"></div>
       ${!esCotizacion ? `<div class="recibo-dato"><strong>Recibo No:</strong> ${r.numero}</div>` : ""}
       ${esDevolucion && r.reciboOriginal ? `<div class="recibo-dato"><strong>Devolución del recibo:</strong> #${r.reciboOriginal}</div>` : ""}

@@ -1413,6 +1413,7 @@
   let clientesCache = null;
   let historialRowsCache = null;
   let alertaInventarioMostrada = false; // 📦 para que la alerta de inventario solo aparezca una vez por sesión de pestaña
+  let alertaCodigosDuplicadosMostrada = false; // 🔍 idem, para la validación de códigos duplicados
   let typingBubble = null;
   let ws = null;
   let wsReconectando = false;
@@ -1490,6 +1491,7 @@
     filterProducts(); // vuelve a aplicar el texto de búsqueda actual sobre las tarjetas recién creadas
     sincronizarCarritoConCatalogo(); // ver definición más abajo (punto 3: mantener el carrito al día con el catálogo)
     revisarInventarioBajoUnaVez(); // 📦 alerta de stock bajo/agotado, solo la primera vez que carga el catálogo y solo si ya eres admin
+    revisarCodigosDuplicadosUnaVez(); // 🔍 idem, para códigos de producto duplicados
 
     window.scrollTo({ top: scrollPrevio, behavior: "instant" });
   };
@@ -1789,6 +1791,39 @@
     revisarInventarioBajo();
   }
 
+  // 🔍 Validación de integridad del catálogo: códigos de producto
+  // duplicados en la hoja "Lista". Como TODO el sistema identifica
+  // productos por código (venta, devolución, actualización de stock), un
+  // código repetido puede causar errores silenciosos difíciles de rastrear
+  // (por ejemplo, vender/descontar stock del producto equivocado). Se
+  // avisa una sola vez por sesión, solo a admin.
+  function revisarCodigosDuplicadosUnaVez() {
+    if (alertaCodigosDuplicadosMostrada) return;
+    if (!isAdmin() || !productosData.length) return;
+    alertaCodigosDuplicadosMostrada = true;
+
+    const conteo = {};
+    productosData.forEach(p => {
+      const codigo = (p.code || "").toString().trim();
+      if (!codigo) return;
+      if (!conteo[codigo]) conteo[codigo] = [];
+      conteo[codigo].push(p.name);
+    });
+
+    const duplicados = Object.entries(conteo).filter(([, nombres]) => nombres.length > 1);
+    if (duplicados.length === 0) return;
+
+    const detalle = duplicados
+      .map(([codigo, nombres]) => `• Código "${codigo}": ${nombres.join(" / ")}`)
+      .join("\n");
+
+    alert(
+      `⚠️ Se encontraron códigos de producto DUPLICADOS en el catálogo:\n\n${detalle}\n\n` +
+      `Esto puede causar errores al vender, devolver o actualizar inventario (el sistema identifica los productos por su código). ` +
+      `Corrige los códigos duplicados en la hoja "Lista" cuanto antes.`
+    );
+  }
+
   // 📦 Estado de la alerta de inventario, guardado en variables globales
   // para poder re-filtrar por marca sin tener que recalcular sinStock/stockBajo.
   let inventarioBajoSinStock = [];
@@ -2000,7 +2035,12 @@
 
   function guardarCarritoEnStorage() {
     try {
-      localStorage.setItem(CARRITO_STORAGE_KEY, JSON.stringify({ cart, cartAdjustment }));
+      const datosCliente = {
+        nombre: document.getElementById("clienteNombre")?.value || "",
+        doc: document.getElementById("clienteDoc")?.value || "",
+        tel: document.getElementById("clienteTel")?.value || ""
+      };
+      localStorage.setItem(CARRITO_STORAGE_KEY, JSON.stringify({ cart, cartAdjustment, datosCliente }));
     } catch (e) {
       console.error("No se pudo guardar el carrito en localStorage:", e);
     }
@@ -2011,6 +2051,16 @@
       const guardado = localStorage.getItem(CARRITO_STORAGE_KEY);
       if (!guardado) return;
       const datos = JSON.parse(guardado);
+
+      // 🧾 Datos del cliente: se restauran de forma independiente del
+      // carrito (aunque el carrito esté vacío), por si cerraste la página
+      // a mitad de escribirlos.
+      if (datos.datosCliente) {
+        if (datos.datosCliente.nombre) document.getElementById("clienteNombre").value = datos.datosCliente.nombre;
+        if (datos.datosCliente.doc) document.getElementById("clienteDoc").value = datos.datosCliente.doc;
+        if (datos.datosCliente.tel) document.getElementById("clienteTel").value = datos.datosCliente.tel;
+      }
+
       if (Array.isArray(datos.cart) && datos.cart.length > 0) {
         cart = datos.cart;
         if (datos.cartAdjustment && datos.cartAdjustment.type) {
@@ -2030,6 +2080,13 @@
     }
   }
   restaurarCarritoDesdeStorage();
+
+  // 💾 Guardar también mientras se escriben los datos del cliente (no solo
+  // cuando cambia el carrito), para no perderlos si cierras la página a
+  // mitad de captura.
+  ["clienteNombre", "clienteDoc", "clienteTel"].forEach(id => {
+    document.getElementById(id).addEventListener("input", guardarCarritoEnStorage);
+  });
 
   cartIcon.onclick = () => cartPanel.classList.toggle("open");
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
@@ -2851,6 +2908,7 @@ function mostrarSugerencias(code) {
       aplicarEstadoAdmin();
       showToast("✅ Acceso de administrador activado.");
       revisarInventarioBajoUnaVez();
+      revisarCodigosDuplicadosUnaVez();
     } else {
       document.getElementById("adminLoginError").textContent = "Contraseña incorrecta.";
     }
@@ -3773,6 +3831,7 @@ function mostrarSugerencias(code) {
     document.getElementById("clienteNombre").value = "";
     document.getElementById("clienteDoc").value = "";
     document.getElementById("clienteTel").value = "";
+    guardarCarritoEnStorage(); // el .value="" de arriba no dispara el evento "input", así que se guarda a mano
     document.getElementById("clienteSugerencias").classList.remove("visible");
     clientesCacheTime = 0; // fuerza a releer "Clientes" en la próxima búsqueda (por si se guardó/actualizó uno nuevo)
     document.getElementById("formaPago").value = "";

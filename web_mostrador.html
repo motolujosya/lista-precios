@@ -1989,6 +1989,48 @@
   const cartPanel = document.getElementById("cartPanel");
   const cartItemsDiv = document.getElementById("cartItems");
 
+  // 💾 Persistencia del carrito entre sesiones (localStorage, a diferencia
+  // de sessionStorage, sobrevive aunque cierres la pestaña o el navegador
+  // por completo). Así, si por error cierras la página con productos ya
+  // agregados, al volver a abrirla siguen ahí.
+  // Nota: los códigos de producto restaurados se validan solos contra el
+  // catálogo vigente en cuanto este termine de cargar (ver
+  // sincronizarCarritoConCatalogo), igual que al cargar un pedido guardado.
+  const CARRITO_STORAGE_KEY = "carritoActivo";
+
+  function guardarCarritoEnStorage() {
+    try {
+      localStorage.setItem(CARRITO_STORAGE_KEY, JSON.stringify({ cart, cartAdjustment }));
+    } catch (e) {
+      console.error("No se pudo guardar el carrito en localStorage:", e);
+    }
+  }
+
+  function restaurarCarritoDesdeStorage() {
+    try {
+      const guardado = localStorage.getItem(CARRITO_STORAGE_KEY);
+      if (!guardado) return;
+      const datos = JSON.parse(guardado);
+      if (Array.isArray(datos.cart) && datos.cart.length > 0) {
+        cart = datos.cart;
+        if (datos.cartAdjustment && datos.cartAdjustment.type) {
+          cartAdjustment = datos.cartAdjustment;
+          if (cartAdjustment.type === "percent") {
+            document.getElementById("descuentoPorcentaje").value = cartAdjustment.value;
+          } else if (cartAdjustment.type === "manual") {
+            document.getElementById("totalManual").value = cartAdjustment.value;
+            actualizarTotalManualFormateado();
+          }
+        }
+        updateCartDisplay();
+        showToast("🛒 Recuperamos el carrito que tenías antes de cerrar la página.");
+      }
+    } catch (e) {
+      console.error("No se pudo restaurar el carrito guardado:", e);
+    }
+  }
+  restaurarCarritoDesdeStorage();
+
   cartIcon.onclick = () => cartPanel.classList.toggle("open");
   document.getElementById("closeCartBtn").onclick = () => cartPanel.classList.remove("open");
 
@@ -2205,6 +2247,8 @@ function mostrarSugerencias(code) {
 }
 
   function updateCartDisplay() {
+    guardarCarritoEnStorage(); // 💾 persiste el carrito ANTES de renderizar, para no perder nada si algo falla al pintar
+
     cartItemsDiv.innerHTML = "";
     cart.forEach((item, i) => {
       const row = document.createElement("div");

@@ -1599,7 +1599,9 @@
           showToast(`⚠️ No hay más stock disponible de "${name}"`);
           return;
         }
-        addToCart(name, card.querySelector("select").value, code, info);
+        const select = card.querySelector("select");
+        const tarifaSeleccionada = select.selectedIndex === 1 ? "taller" : "publico";
+        addToCart(name, select.value, code, info, tarifaSeleccionada);
       };
 
       card.querySelector(".copy-btn").onclick = () => {
@@ -2170,9 +2172,17 @@
     return null;
   }
 
-  function addToCart(name, price, code = "", info = "") {
+  function addToCart(name, price, code = "", info = "", tarifaForzada = null) {
     const label = buildProductLabel(code, name, info);
-    const tarifa = detectarTarifaProducto(code, price);
+    // Si quien llama ya sabe con certeza qué tarifa es (por ejemplo, porque
+    // sabe qué botón se apretó: "Precio Publico" vs "Precio Taller"), se
+    // respeta ese dato directamente. Si no se indica, se cae al método
+    // anterior de intentar detectarla comparando el precio contra el
+    // catálogo (que puede fallar si el precio recibido no coincide al
+    // centavo, por ejemplo cuando viene de una fuente externa como el chat).
+    const tarifa = (tarifaForzada === "publico" || tarifaForzada === "taller")
+      ? tarifaForzada
+      : detectarTarifaProducto(code, price);
     const existing = cart.find(p => p.code === code && p.price == price);
     if (existing) existing.qty++;
     else cart.push({ code, name, info, label, price: parseFloat(price), qty: 1, tarifa });
@@ -4234,11 +4244,19 @@ function agregarTarjetaProducto(p) {
   tarjeta.querySelectorAll(".cp-add-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const precio = parseFloat(btn.dataset.precio);
+      // 🏷️ Se indica explícitamente la tarifa según qué botón se apretó,
+      // en vez de dejar que addToCart intente adivinarla comparando el
+      // precio contra el catálogo. El precio que llega desde el chat puede
+      // no coincidir al centavo con el precio "vivo" del catálogo (por
+      // caché o por cambios de precio posteriores), y eso era lo que
+      // dejaba estas ventas sin tipo de venta ("tarifa": null).
+      const tarifa = btn.classList.contains("cp-add-taller") ? "taller" : "publico";
       addToCart(
         p.nombre ?? "Producto",
         precio,
         p.codigo ?? "",
-        p.info ?? ""
+        p.info ?? "",
+        tarifa
       );
       // Feedback visual breve
       const original = btn.textContent;

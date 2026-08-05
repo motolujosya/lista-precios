@@ -1368,6 +1368,13 @@
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzumlTHwgMOANtajyuNe-TSW5CZzMXge8F1xPd-oZDRVg6wpWOWmYkCfelXvlKbBGNG8Q/exec";
+  // 🔐 NUEVO: clave compartida que se manda en cada request al Apps Script
+  // (campo "apiKey"). Debe ser EXACTAMENTE el mismo valor que guardaste en
+  // Script Properties bajo el nombre "API_KEY" en el editor de Apps Script.
+  // Como este HTML es público, esta clave no es un secreto perfecto (cualquiera
+  // que vea el código fuente de la página la puede leer), pero sí bloquea
+  // que alguien llame al webhook directamente sin pasar por esta interfaz.
+  const WEBAPP_API_KEY = "CAMBIA_ESTO_por_una_clave_larga_y_unica";
   const ENTORNO = "produccion";
   
 
@@ -1717,6 +1724,7 @@
 
         const data = {
           action: "guardarPedidoPendiente",
+          apiKey: WEBAPP_API_KEY,
           proveedor: "",
           moto,
           producto,
@@ -2567,6 +2575,7 @@ function mostrarSugerencias(code) {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           action: "registrarDevolucion",
+          apiKey: WEBAPP_API_KEY,
           numeroReciboOriginal: numeroOriginal,
           motivo,
           entorno: ENTORNO,
@@ -3777,6 +3786,7 @@ function mostrarSugerencias(code) {
 
   try {
     const data = {
+      apiKey: WEBAPP_API_KEY,
       entorno: ENTORNO,
       subtotal,
       descuento,

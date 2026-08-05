@@ -1409,6 +1409,13 @@
   
 
   let cart = [];
+  // 🔐 NUEVO: ID único del intento de venta actual. Se genera la PRIMERA
+  // vez que se manda la venta al servidor, y se REUTILIZA si el mismo
+  // carrito se reintenta (por ejemplo, tras un error de conexión) — así
+  // el backend puede reconocer "este es el mismo intento de antes" y
+  // evitar registrar la venta dos veces. Se limpia (para que la próxima
+  // venta genere un ID nuevo) apenas el carrito se vacía con éxito.
+  let idTransaccionVentaActual = null;
   let productosData = []; // guarda referencia a todos los productos renderizados
 
   // 🔧 Variables de estado consolidadas aquí arriba (antes se declaraban más
@@ -2332,6 +2339,13 @@ function mostrarSugerencias(code) {
 }
 
   function updateCartDisplay() {
+    // 🔐 El carrito (o el descuento/total aplicado) cambió respecto a como
+    // estaba en el último intento de venta enviado: cualquier ID de
+    // transacción guardado ya no representa lo que hay ahora en el
+    // carrito, así que se descarta. Si se vuelve a intentar la venta, se
+    // generará uno nuevo con el contenido actual.
+    idTransaccionVentaActual = null;
+
     guardarCarritoEnStorage(); // 💾 persiste el carrito ANTES de renderizar, para no perder nada si algo falla al pintar
 
     cartItemsDiv.innerHTML = "";
@@ -3785,8 +3799,18 @@ function mostrarSugerencias(code) {
   console.log("📦 Preparando venta...");
 
   try {
+    // 🔐 Se reutiliza el mismo ID si ya existe (significa que este carrito
+    // ya se intentó mandar antes y no se confirmó éxito); si es la
+    // primera vez que se manda ESTE carrito, se genera uno nuevo.
+    if (!idTransaccionVentaActual) {
+      idTransaccionVentaActual = (crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    }
+
     const data = {
       apiKey: WEBAPP_API_KEY,
+      transaccionId: idTransaccionVentaActual,
       entorno: ENTORNO,
       subtotal,
       descuento,
@@ -3854,6 +3878,7 @@ function mostrarSugerencias(code) {
     });
 
     cart = [];
+    idTransaccionVentaActual = null; // 🔐 esta venta ya quedó confirmada: la próxima debe llevar un ID nuevo
     resetCartAdjustment();
     updateCartDisplay();
 

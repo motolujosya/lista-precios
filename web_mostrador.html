@@ -2762,21 +2762,36 @@ function mostrarSugerencias(code) {
       updateCartDisplay();
       document.getElementById("quotesModal").style.display = "none";
       cartPanel.classList.add("open");
-      showToast("⏳ El catálogo aún está cargando: no se pudo verificar si los códigos siguen vigentes. Revísalo en unos segundos.");
+      showToast("⏳ El catálogo aún está cargando: no se pudo verificar si los códigos siguen vigentes ni el stock disponible. Revísalo en unos segundos.");
       return;
     }
 
-    // 🔎 Separamos los productos cuyo código YA NO EXISTE en el catálogo
-    // actual (por ejemplo, porque alguien le cambió el código al producto
-    // después de guardar el pedido). Si los dejáramos pasar, se verían en
-    // el carrito con datos "congelados" pero la venta fallaría al
-    // finalizar porque el código no corresponde a nada real.
+    // 🔎 Separamos los productos del pedido guardado en tres grupos:
+    //   - válidos: el código sigue existiendo en el catálogo Y tiene stock
+    //     suficiente para la cantidad guardada.
+    //   - código no encontrado: el producto ya no existe en el catálogo
+    //     (por ejemplo, le cambiaron el código después de guardar el
+    //     pedido).
+    //   - sin stock: el producto sigue existiendo, pero no hay suficiente
+    //     inventario disponible ahora mismo. No se agrega al carrito para
+    //     no dejar pasar una venta que fallaría al finalizar (o que
+    //     vendería algo que ya no hay).
     const itemsValidos = [];
     const itemsRechazados = [];
+    const itemsSinStock = [];
     itemsGuardados.forEach(item => {
       if (!item.code) { itemsValidos.push(item); return; } // ítems manuales sin código propio
-      const existeEnCatalogo = productosData.some(p => p.code === item.code);
-      (existeEnCatalogo ? itemsValidos : itemsRechazados).push(item);
+
+      const producto = productosData.find(p => p.code === item.code);
+      if (!producto) { itemsRechazados.push(item); return; }
+
+      const cantidadPedida = parseInt(item.qty) || 0;
+      if ((producto.stock || 0) < cantidadPedida) {
+        itemsSinStock.push({ item, stockDisponible: producto.stock || 0 });
+        return;
+      }
+
+      itemsValidos.push(item);
     });
 
     cart = itemsValidos;
@@ -2809,13 +2824,25 @@ function mostrarSugerencias(code) {
     document.getElementById("quotesModal").style.display = "none";
     cartPanel.classList.add("open");
 
-    if (itemsRechazados.length > 0) {
-      const listado = itemsRechazados
-        .map(it => `• ${it.name || it.label || "Producto"}  (código guardado: ${it.code})`)
-        .join("\n");
-      alert(
-        `⚠️ Atención: ${itemsRechazados.length} producto(s) del pedido "${quote.nombre}" NO se agregaron al carrito porque su código ya no coincide con ningún producto del catálogo actual (probablemente se le cambió el código a ese producto):\n\n${listado}\n\nBúscalos de nuevo por nombre y agrégalos manualmente con su código actual.`
-      );
+    if (itemsRechazados.length > 0 || itemsSinStock.length > 0) {
+      let mensaje = "";
+
+      if (itemsRechazados.length > 0) {
+        const listado = itemsRechazados
+          .map(it => `• ${it.name || it.label || "Producto"}  (código guardado: ${it.code})`)
+          .join("\n");
+        mensaje += `⚠️ ${itemsRechazados.length} producto(s) del pedido "${quote.nombre}" NO se agregaron porque su código ya no coincide con ningún producto del catálogo actual (probablemente se le cambió el código a ese producto):\n\n${listado}\n\nBúscalos de nuevo por nombre y agrégalos manualmente con su código actual.\n\n`;
+      }
+
+      if (itemsSinStock.length > 0) {
+        const listado = itemsSinStock
+          .map(({ item, stockDisponible }) =>
+            `• ${item.name || item.label || "Producto"}  (pedido: ${item.qty}, disponible: ${stockDisponible})`)
+          .join("\n");
+        mensaje += `📦 ${itemsSinStock.length} producto(s) del pedido "${quote.nombre}" NO se agregaron por falta de stock suficiente:\n\n${listado}`;
+      }
+
+      alert(mensaje.trim());
     }
 
     showToast(preciosActualizados > 0

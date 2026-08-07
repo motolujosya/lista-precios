@@ -1495,6 +1495,13 @@
   window.google = window.google || {};
   window.google.visualization = window.google.visualization || {};
   window.google.visualization.Query = window.google.visualization.Query || {};
+  // 🔄 NUEVO: lista de "avisos pendientes" del PRÓXIMO refresco del
+  // catálogo. La API de Google Sheets (GViz) usa un único callback global
+  // para avisar que ya llegó la respuesta, así que cualquier código que
+  // necesite ESPERAR a que el catálogo esté al día (por ejemplo, antes de
+  // cargar un pedido guardado, para no arrastrar un precio desactualizado)
+  // se anota aquí con recargarCatalogo() y se le avisa cuando termine.
+  let resolutoresEsperandoCatalogo = [];
   window.google.visualization.Query.setResponse = function(response) {
     if (!response || !response.table) return alert("Error cargando datos");
     const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase());
@@ -1513,10 +1520,26 @@
     revisarCodigosDuplicadosUnaVez(); // 🔍 idem, para códigos de producto duplicados
 
     window.scrollTo({ top: scrollPrevio, behavior: "instant" });
+
+    const resolutores = resolutoresEsperandoCatalogo;
+    resolutoresEsperandoCatalogo = [];
+    resolutores.forEach(resolve => resolve());
   };
-  const s = document.createElement('script');
-  s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
-  document.head.appendChild(s);
+
+  // 🔄 NUEVO: dispara una recarga del catálogo (nombre, precio, stock, etc.
+  // — todo lo que trae la hoja "Lista") y devuelve una Promise que se
+  // resuelve cuando productosData ya quedó actualizado. Reemplaza a crear
+  // el <script> a mano en cada punto que necesitaba refrescar el catálogo.
+  function recargarCatalogo() {
+    return new Promise(resolve => {
+      resolutoresEsperandoCatalogo.push(resolve);
+      const s = document.createElement('script');
+      s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&_=${Date.now()}`;
+      document.head.appendChild(s);
+    });
+  }
+
+  recargarCatalogo(); // primera carga al abrir la página
 
   function githubRaw(url) {
     if (!url) return "";
@@ -2742,7 +2765,7 @@ function mostrarSugerencias(code) {
     }).join("");
   }
 
-  function cargarPedidoGuardado(id) {
+  async function cargarPedidoGuardado(id) {
     const quotes = getSavedQuotes();
     const quote = quotes.find(q => q.id === id);
     if (!quote) return;
@@ -2752,6 +2775,15 @@ function mostrarSugerencias(code) {
     }
 
     const itemsGuardados = JSON.parse(JSON.stringify(quote.items));
+
+    // 🔄 NUEVO: antes de validar precios y stock, se refresca el catálogo
+    // contra la hoja de cálculo. Sin esto, si el pedido se guardó hace
+    // rato y mientras tanto alguien actualizó un precio, esta pestaña
+    // podía seguir mostrando el precio VIEJO (el que tenía cargado en
+    // memoria desde que se abrió la página o la última venta), aunque el
+    // precio real en la hoja ya fuera otro.
+    showToast("🔄 Actualizando precios y stock antes de cargar el pedido...");
+    await recargarCatalogo();
 
     // 🚫 Si el catálogo aún no ha terminado de cargar en esta pestaña, NO
     // podemos verificar códigos con confianza (productosData estaría vacío
@@ -3923,11 +3955,7 @@ function mostrarSugerencias(code) {
     
     cartPanel.classList.remove("open");
     // Recarga solo el catálogo sin destruir el WebSocket
-    setTimeout(() => {
-      const s = document.createElement('script');
-      s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&_=${Date.now()}`;
-      document.head.appendChild(s);
-    }, 2000);
+    setTimeout(() => recargarCatalogo(), 2000);
 
   } catch (err) {
     console.error("❌ Error completo:", err);
@@ -4214,7 +4242,24 @@ function conectarWS() {
   // Cuando llega un mensaje desde el backend (vía Redis Pub/Sub)
   ws.onmessage = (event) => {
     if (event.data === "__pong__") return; // ignorar respuesta de ping
-    const datos = JSON.parse(event.data);
+
+    // 🛡️ NUEVO: si el backend manda algo que no es JSON válido (por
+    // ejemplo, un error a medio formatear, o la conexión se corta justo
+    // en medio de un mensaje), esto antes fallaba EN SILENCIO: no salía
+    // ningún aviso en pantalla y la burbuja de "escribiendo..." se
+    // quedaba pegada para siempre (o nunca aparecía nada). Ahora se
+    // avisa en el chat y se libera el botón de enviar para poder
+    // reintentar.
+    let datos;
+    try {
+      datos = JSON.parse(event.data);
+    } catch (err) {
+      console.error("❌ Mensaje del chat no es JSON válido:", event.data, err);
+      if (typingBubble) { typingBubble.remove(); typingBubble = null; }
+      agregarBurbuja("⚠️ Hubo un problema leyendo la respuesta del asistente. Intenta de nuevo.", "bot");
+      chatSendBtn.disabled = false;
+      return;
+    }
 
     if (datos.status === "processing") {
       // Muestra/actualiza la burbuja de "escribiendo..." con el paso actual del agente
@@ -4244,6 +4289,19 @@ function conectarWS() {
         agregarBurbuja(datos.response_text, "bot");
       }
 
+      chatSendBtn.disabled = false;
+    } else {
+      // 🛡️ NUEVO: cualquier otro estado (por ejemplo, si el backend manda
+      // "status: error" cuando algo le falla al procesar la pregunta).
+      // Antes esto no hacía NADA: la burbuja de "escribiendo..." se
+      // quedaba pegada para siempre y el botón de enviar seguía
+      // deshabilitado, dando la sensación de que el chat no respondía.
+      console.warn("⚠️ Mensaje del chat con estado no reconocido:", datos);
+      if (typingBubble) { typingBubble.remove(); typingBubble = null; }
+      agregarBurbuja(
+        datos.response_text || datos.response || datos.error || "⚠️ El asistente no pudo procesar la pregunta. Intenta de nuevo.",
+        "bot"
+      );
       chatSendBtn.disabled = false;
     }
   };

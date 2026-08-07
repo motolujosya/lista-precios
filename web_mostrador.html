@@ -1830,8 +1830,10 @@
   // catálogo tras una venta, para no ser invasivo). Usa la columna
   // "Umbral" de la hoja "Lista" para personalizar por producto a partir de
   // cuántas unidades se considera "stock bajo"; si un producto no tiene
-  // umbral definido, se usa 3 por defecto. Cualquier umbral negativo (no
-  // solo -1) excluye al
+  // umbral definido, se usa 0 por defecto (es decir, solo se avisa cuando
+  // ese producto se quede TOTALMENTE sin stock, no antes — hasta que se le
+  // configure explícitamente un umbral mayor en la hoja). Cualquier umbral
+  // negativo (no solo -1) excluye al
   // producto de la alerta por completo (ni "sin stock" ni "stock bajo"),
   // para productos que no se piensan reponer de inmediato.
   function revisarInventarioBajoUnaVez() {
@@ -1889,7 +1891,7 @@
     productosData.forEach(p => {
       if (p.umbral !== null && p.umbral < 0) return; // excluido: cualquier umbral negativo, no solo -1
 
-      const umbralEfectivo = (p.umbral !== null && p.umbral !== undefined) ? p.umbral : 3;
+      const umbralEfectivo = (p.umbral !== null && p.umbral !== undefined) ? p.umbral : 0;
 
       if (p.stock === 0) {
         sinStock.push(p);
@@ -1969,7 +1971,7 @@
       p.marca || "",
       p.info || "",
       p.stock,
-      (p.umbral !== null && p.umbral !== undefined) ? p.umbral : 3,
+      (p.umbral !== null && p.umbral !== undefined) ? p.umbral : 0,
       inventarioBajoYaPedido.has(p.code) ? "Si" : "No"
     ]);
 

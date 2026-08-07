@@ -1835,9 +1835,7 @@
   // producto de la alerta por completo (ni "sin stock" ni "stock bajo"),
   // para productos que no se piensan reponer de inmediato.
   function revisarInventarioBajoUnaVez() {
-    if (alertaInventarioMostrada) return;
     if (!isAdmin() || !productosData.length) return;
-    alertaInventarioMostrada = true;
     revisarInventarioBajo();
   }
 
@@ -1900,14 +1898,35 @@
       }
     });
 
-    if (sinStock.length === 0 && stockBajo.length === 0) return; // todo en orden, no se muestra nada
-
+    // 🐛 FIX: antes esto se calculaba UNA sola vez por sesión y quedaba
+    // congelado para siempre (aunque se reabasteciera un producto o
+    // cambiara el stock después, la ventana seguía mostrando los números
+    // viejos porque nunca se volvía a calcular). Ahora se recalcula CADA
+    // vez que se refresca el catálogo — lo único que se limita a "una vez
+    // por sesión" es que la ventana se ABRA SOLA, para no interrumpirte
+    // cada vez que el catálogo se refresca en segundo plano (por ejemplo,
+    // tras cada venta).
     inventarioBajoSinStock = sinStock;
     inventarioBajoStockBajo = stockBajo;
-    inventarioBajoMarcasSeleccionadas = new Set(); // al abrir, sin filtro (se ven todas)
 
-    renderInventarioBajo();
-    document.getElementById("inventarioBajoModal").style.display = "flex";
+    const modal = document.getElementById("inventarioBajoModal");
+    const yaEstaAbierta = modal.style.display === "flex";
+
+    if (yaEstaAbierta) {
+      // Se refresca en vivo lo que se está mostrando, sin tocar el filtro
+      // de marca que el admin ya haya elegido.
+      renderInventarioBajo();
+      return;
+    }
+
+    if (sinStock.length === 0 && stockBajo.length === 0) return; // todo en orden, no se muestra nada
+
+    if (!alertaInventarioMostrada) {
+      alertaInventarioMostrada = true;
+      inventarioBajoMarcasSeleccionadas = new Set(); // al abrir, sin filtro (se ven todas)
+      renderInventarioBajo();
+      modal.style.display = "flex";
+    }
   }
 
   function toggleFiltroMarcaInventario(marca) {
@@ -2252,21 +2271,28 @@ function sincronizarItemConCatalogo(item) {
     cambio = true;
   }
 
-  // Si no sabemos qué tarifa se eligió porque el campo ni siquiera existe
-  // (por ejemplo, un pedido guardado ANTES de que existiera este campo),
-  // asumimos "público" como respaldo razonable, igual que se hacía antes.
-  //
-  // OJO: esto es distinto de que item.tarifa sea explícitamente `null`.
-  // `null` significa que detectarTarifaProducto() no pudo identificar el
-  // precio como público ni como taller (por ejemplo, un precio manual o
-  // negociado con el cliente). En ese caso NO se debe forzar el precio
-  // público: hay que respetar el precio con el que se guardó el pedido,
-  // porque de lo contrario se pierde el valor original (el bug que hacía
-  // que las cotizaciones recargadas mostraran precio público en vez del
-  // precio con el que realmente se guardaron).
-  if (item.tarifa === null) return cambio;
-
+  // 🐛 FIX: antes, si item.tarifa era exactamente `null`, el precio se
+  // dejaba congelado a propósito (por si era un precio negociado a mano
+  // con el cliente). Se confirmó que, en el sistema actual, no existe
+  // ninguna forma de agregar un producto con un precio negociado por
+  // ítem — la única causa real de `tarifa: null` era un bug al agregar
+  // productos desde el chat (ya corregido) que los dejaba mal
+  // etiquetados aunque su precio SÍ era el público o el taller normal.
+  // Por eso ahora, igual que cuando el campo "tarifa" ni siquiera existe
+  // (pedidos guardados de antes de que existiera este campo), se asume
+  // "público" como respaldo y se actualiza el precio con el vigente.
   const tarifa = item.tarifa === "taller" ? "taller" : "publico";
+
+  // 🐛 FIX adicional: no basta con actualizar el PRECIO según la tarifa
+  // asumida — si item.tarifa se queda en `null`/`undefined`, la venta se
+  // sigue registrando sin "Tipo de venta" al finalizar (el problema
+  // original). Se deja guardada la tarifa asumida para que la venta
+  // quede correctamente etiquetada.
+  if (item.tarifa !== "publico" && item.tarifa !== "taller") {
+    item.tarifa = tarifa;
+    cambio = true;
+  }
+
   const nuevoPrecio = parseFloat(tarifa === "taller" ? producto.priceDesc : producto.price);
   if (!isNaN(nuevoPrecio) && nuevoPrecio !== item.price) {
     item.price = nuevoPrecio;

@@ -4008,6 +4008,76 @@ function parseFechaSheet(val) {
     return `${y}-${m}-${day}`;
   }
 
+  // 📊 NUEVO: comparativo con el periodo anterior en "Historial de venta".
+  //
+  // "Periodo anterior" = las mismas fechas "Desde"/"Hasta" pero restándoles
+  // exactamente 1 mes (conservando el día). Con esta única regla se
+  // cumplen los dos casos que se pidieron a la vez:
+  //   - Rango personalizado (ej. 18 jul–6 ago) -> mismo rango un mes atrás
+  //     (18 jun–6 jul), no "misma cantidad de días" (eso daría un rango
+  //     distinto por los meses de distinta duración).
+  //   - Mes calendario completo (ej. 1–31 ago) -> el mes calendario
+  //     completo anterior (1–31 jul), automáticamente, sin caso especial.
+  // Si el mes anterior no tiene ese día (ej. 31 de marzo -> no hay 31 de
+  // febrero), se ajusta al último día de ese mes.
+  function restarUnMes(fecha) {
+    const dia = fecha.getDate();
+    const resultado = new Date(fecha.getFullYear(), fecha.getMonth() - 1, 1);
+    const ultimoDiaMesAnterior = new Date(resultado.getFullYear(), resultado.getMonth() + 1, 0).getDate();
+    resultado.setDate(Math.min(dia, ultimoDiaMesAnterior));
+    return resultado;
+  }
+
+  // Devuelve { desde, hasta } (strings "yyyy-mm-dd") del periodo anterior,
+  // o null si no hay un rango completo seleccionado (sin "Desde" y "Hasta"
+  // no hay forma de saber qué tan largo es el periodo actual).
+  function calcularPeriodoAnterior(desdeStr, hastaStr) {
+    if (!desdeStr || !hastaStr) return null;
+    return {
+      desde: formatFechaISO(restarUnMes(new Date(desdeStr + "T00:00:00"))),
+      hasta: formatFechaISO(restarUnMes(new Date(hastaStr + "T00:00:00")))
+    };
+  }
+
+  // Recorre historialRowsCache y devuelve los totales agregados (mismo
+  // criterio que usa renderHistorial para el periodo actual) para
+  // cualquier rango de fechas — se reutiliza tanto para el periodo
+  // mostrado como para el periodo anterior del comparativo.
+  function calcularResumenRango(desdeStr, hastaStr) {
+    let total = 0;
+    let margen = 0;
+    const porTipo = { Publico: 0, Taller: 0, "—": 0 };
+
+    (historialRowsCache || []).forEach(r => {
+      const fechaDia = (r[0] || "").toString().split(" ")[0];
+      if (desdeStr && fechaDia < desdeStr) return;
+      if (hastaStr && fechaDia > hastaStr) return;
+
+      const subtotal = Number(r[4]) || 0;
+      total += subtotal;
+      margen += Number(r[8]) || 0;
+
+      const tipoVenta = r[12] === "Publico" || r[12] === "Taller" ? r[12] : "—";
+      porTipo[tipoVenta] += subtotal;
+    });
+
+    return { total, margen, publico: porTipo.Publico, taller: porTipo.Taller };
+  }
+
+  // Arma el "▲ 12.3%" / "▼ 4.1%" / "▬ sin cambio" coloreado, comparando el
+  // valor actual contra el del periodo anterior.
+  function formatCambioPorcentual(actual, anterior) {
+    if (anterior === 0) {
+      if (actual === 0) return `<span style="color:#999">▬ sin cambio</span>`;
+      return `<span style="color:#2e7d32">▲ nuevo (no había en el periodo anterior)</span>`;
+    }
+    const cambio = ((actual - anterior) / Math.abs(anterior)) * 100;
+    if (Math.abs(cambio) < 0.05) return `<span style="color:#999">▬ sin cambio</span>`;
+    const flecha = cambio > 0 ? "▲" : "▼";
+    const color = cambio > 0 ? "#2e7d32" : "#c62828";
+    return `<span style="color:${color}">${flecha} ${Math.abs(cambio).toFixed(1)}%</span>`;
+  }
+
   // 📋 Ver historial (carga los datos UNA vez y los deja en caché;
   // el filtrado por fecha se hace después en el navegador, sin re-consultar el Sheet)
   async function verHistorial() {
@@ -4114,6 +4184,22 @@ function parseFechaSheet(val) {
     let resumenHTML = `<div style="font-size:15px; margin-bottom:8px;">🧮 Total del periodo mostrado: ${formatCurrency(totalGeneral)}</div>`;
     resumenHTML += `<div style="font-size:14px; margin-bottom:4px;">💵 Margen total: ${formatCurrency(margenTotal)} (${margenPorcentajeTotal.toFixed(1)}%)</div>`;
     resumenHTML += `<div style="font-size:14px; margin-bottom:12px;">🏷️ Público: ${formatCurrency(ventasPorTipo.Publico)} · Taller: ${formatCurrency(ventasPorTipo.Taller)}${ventasPorTipo["—"] !== 0 ? ` · Sin clasificar: ${formatCurrency(ventasPorTipo["—"])}` : ""}</div>`;
+
+    // 📊 NUEVO: comparativo contra el mismo periodo, un mes antes.
+    const periodoAnterior = calcularPeriodoAnterior(desde, hasta);
+    if (periodoAnterior) {
+      const resumenAnterior = calcularResumenRango(periodoAnterior.desde, periodoAnterior.hasta);
+      resumenHTML += `<div style="background:#f5f5f5; border-radius:8px; padding:10px 12px; margin-bottom:12px;">`;
+      resumenHTML += `<div style="font-size:12px; color:#666; margin-bottom:6px;">📊 Comparado con el periodo anterior (${periodoAnterior.desde} a ${periodoAnterior.hasta}):</div>`;
+      resumenHTML += `<div style="font-size:13px; margin-bottom:2px;">🧮 Total: ${formatCurrency(resumenAnterior.total)} → ${formatCambioPorcentual(totalGeneral, resumenAnterior.total)}</div>`;
+      resumenHTML += `<div style="font-size:13px; margin-bottom:2px;">💵 Margen: ${formatCurrency(resumenAnterior.margen)} → ${formatCambioPorcentual(margenTotal, resumenAnterior.margen)}</div>`;
+      resumenHTML += `<div style="font-size:13px; margin-bottom:2px;">🏷️ Público: ${formatCurrency(resumenAnterior.publico)} → ${formatCambioPorcentual(ventasPorTipo.Publico, resumenAnterior.publico)}</div>`;
+      resumenHTML += `<div style="font-size:13px;">🔧 Taller: ${formatCurrency(resumenAnterior.taller)} → ${formatCambioPorcentual(ventasPorTipo.Taller, resumenAnterior.taller)}</div>`;
+      resumenHTML += `</div>`;
+    } else {
+      resumenHTML += `<div style="font-size:12px; color:#999; margin-bottom:12px;">📊 Selecciona un rango de fechas "Desde" y "Hasta" para ver el comparativo con el periodo anterior.</div>`;
+    }
+
     resumenHTML += "💰 Totales por día:<br><br>";
 
     Object.keys(resumenDias)

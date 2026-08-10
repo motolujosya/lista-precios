@@ -3159,6 +3159,21 @@ function mostrarSugerencias(code) {
   // conectado antes en una sesión anterior).
   document.addEventListener("DOMContentLoaded", actualizarVisibilidadBotonUSB);
 
+  // 🔌 NUEVO: el propio navegador avisa cuando un dispositivo USB se
+  // desconecta (se apaga la impresora, se saca el cable, etc.). Si es la
+  // que teníamos vinculada, limpiamos el estado de inmediato para que la
+  // próxima impresión sepa que debe reconectar en vez de intentar hablarle
+  // a un dispositivo que ya no está.
+  if ("usb" in navigator) {
+    navigator.usb.addEventListener("disconnect", (event) => {
+      if (dispositivoUSB && event.device === dispositivoUSB) {
+        dispositivoUSB = null;
+        endpointSalidaUSB = null;
+        actualizarVisibilidadBotonUSB();
+      }
+    });
+  }
+
   // Busca, dentro de un dispositivo USB ya abierto, la interfaz y el
   // "endpoint" de salida (por donde se le mandan los datos a imprimir).
   function buscarEndpointSalida(dispositivo) {
@@ -3239,8 +3254,31 @@ function mostrarSugerencias(code) {
       return true;
     } catch (e) {
       console.error(e);
-      alert("Error enviando los datos a la impresora: " + e.message);
-      return false;
+      // 🔌 NUEVO: si el envío falla es probable que la impresora se haya
+      // desconectado en algún momento (se apagó, se desenchufó el cable,
+      // Windows "recuperó" el dispositivo para su driver normal, etc.) y
+      // el objeto dispositivoUSB que teníamos guardado ya no sirve, aunque
+      // la variable siga marcada como "conectada". Antes esto mostraba un
+      // error y quedaba así hasta recargar la página. Ahora limpiamos el
+      // estado, intentamos reconectar automáticamente (primero en
+      // silencio con el dispositivo ya autorizado, y si no, pidiéndolo de
+      // nuevo) y reintentamos el envío UNA vez.
+      dispositivoUSB = null;
+      endpointSalidaUSB = null;
+      actualizarVisibilidadBotonUSB();
+      const ok = (await reconectarImpresoraUSBGuardada()) || (await conectarImpresoraUSB());
+      if (!ok) {
+        alert("Se perdió la conexión con la impresora y no se pudo reconectar automáticamente. Vuelve a conectarla con el botón 🔌.");
+        return false;
+      }
+      try {
+        await dispositivoUSB.transferOut(endpointSalidaUSB, bytes);
+        return true;
+      } catch (e2) {
+        console.error(e2);
+        alert("Error enviando los datos a la impresora, incluso después de reconectar: " + e2.message);
+        return false;
+      }
     }
   }
 
@@ -4324,6 +4362,11 @@ new MutationObserver(actualizarBloqueoScrollFondo).observe(chatPanel, { attribut
 // Identificador único para esta sesión de chat
 const clientId = crypto.randomUUID();
 
+// 🔌 NUEVO: si el usuario manda un mensaje justo cuando el chat está
+// desconectado, lo guardamos aquí en vez de perderlo. Se reenvía solo
+// en cuanto el WebSocket vuelve a abrir (ver conectarWS -> ws.onopen).
+let mensajePendiente = null;
+
 function conectarWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
@@ -4337,6 +4380,16 @@ function conectarWS() {
     pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send("__ping__");
     }, 25000);
+
+    // 🔌 NUEVO: si había un mensaje que el usuario intentó mandar mientras
+    // estábamos desconectados, se reenvía automáticamente ahora que la
+    // conexión volvió. El botón de enviar sigue deshabilitado (como en un
+    // envío normal) hasta que llegue la respuesta del backend.
+    if (mensajePendiente) {
+      const texto = mensajePendiente;
+      mensajePendiente = null;
+      ws.send(texto);
+    }
   };
 
   ws.onclose = () => {
@@ -4519,7 +4572,14 @@ function enviarMensaje() {
 
   // Envía el mensaje al backend por WebSocket
   if (!ws || ws.readyState !== WebSocket.OPEN) {
-    showToast("⏳ Reconectando chat... intenta en un momento.");
+    // 🔌 NUEVO: antes, si el chat estaba desconectado, el mensaje se
+    // perdía (nunca llegaba al backend) y el botón de enviar quedaba
+    // deshabilitado para siempre, porque solo se reactivaba al recibir
+    // una respuesta que nunca iba a llegar. Ahora guardamos el mensaje
+    // y forzamos una reconexión inmediata; en cuanto el WebSocket abra,
+    // se reenvía solo (ver ws.onopen).
+    mensajePendiente = texto;
+    showToast("⏳ Chat desconectado, reconectando...");
     conectarWS();
     return;
   }

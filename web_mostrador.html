@@ -2406,7 +2406,7 @@ function mostrarSugerencias(code) {
               ${formatCurrency(precioMostrar)}
             </p>
           </div>
-          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '')"
+          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '${(p.info || "").replace(/'/g,"\\'")}')"
                   style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
                         border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
                         font-size:12px; flex-shrink:0;">
@@ -2432,8 +2432,13 @@ function mostrarSugerencias(code) {
     cart.forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "cart-row";
+      // 👀 NUEVO: el panel del carrito muestra solo código + nombre (sin
+      // la "info" larga) para que la lista quede más limpia y fácil de
+      // leer. Esto es puramente visual: item.label (con la info completa)
+      // se mantiene intacto y es lo que se sigue usando para la venta, el
+      // recibo impreso y la cotización por WhatsApp — nada de eso cambia.
       row.innerHTML = `
-        <span>${item.label} x${item.qty}</span>
+        <span>${buildProductLabel(item.code, item.name, "")} x${item.qty}</span>
         <span>${formatCurrency(item.price * item.qty)}</span>
         <button class="remove-item" title="Quitar producto" aria-label="Quitar producto">🗑️</button>
       `;
@@ -3992,13 +3997,44 @@ function mostrarSugerencias(code) {
 
     console.log("📦 Enviando al servidor:", JSON.stringify(data));
 
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(data)
-    });
+    // 🔁 NUEVO: Apps Script a veces falla de forma transitoria (la
+    // ejecución del script no llega a producir una respuesta válida y el
+    // navegador recibe un 404/HTML en vez del JSON esperado). Como el
+    // transaccionId se reutiliza mientras la venta no se confirme, es
+    // seguro reintentar automáticamente: si el primer intento no da JSON
+    // válido, se espera un momento y se reintenta una vez más antes de
+    // rendirse y mostrarle el error al usuario.
+    const MAX_INTENTOS_VENTA = 2;
+    let textoRespuesta, response, result;
+    for (let intento = 1; intento <= MAX_INTENTOS_VENTA; intento++) {
+      response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(data)
+      });
 
-    const result = await response.json();
+      // 🩺 Se lee el texto crudo primero (en vez de response.json() directo)
+      // para poder mostrar la respuesta real del servidor si no es JSON
+      // válido — antes el error mostrado era el genérico de parseo
+      // ("Unexpected token '<' ... is not valid JSON"), que no decía nada
+      // sobre la causa real.
+      textoRespuesta = await response.text();
+      try {
+        result = JSON.parse(textoRespuesta);
+        break; // ✅ respuesta válida, no hace falta reintentar
+      } catch (parseErr) {
+        console.error(`❌ Intento ${intento}/${MAX_INTENTOS_VENTA}: el servidor no respondió JSON. Respuesta cruda:`, textoRespuesta);
+        if (intento === MAX_INTENTOS_VENTA) {
+          throw new Error(
+            `El servidor de ventas no respondió correctamente tras ${MAX_INTENTOS_VENTA} intentos (status ${response.status}). ` +
+            `Puede que el deployment de Apps Script esté caído, sin permisos, o con la cuota diaria excedida. ` +
+            `Respuesta recibida: ${textoRespuesta.slice(0, 200)}`
+          );
+        }
+        btn.setAttribute("data-tooltip", "Reintentando...");
+        await new Promise(r => setTimeout(r, 1500)); // pequeña espera antes de reintentar
+      }
+    }
     console.log("✅ Respuesta del servidor:", result);
 
     if (!response.ok || !result.ok) {
@@ -4520,7 +4556,7 @@ function agregarBurbuja(texto, tipo) {
 }
 
 
-function agregarTarjetaProducto(p, { sinInfoEnCarrito = false } = {}) {
+function agregarTarjetaProducto(p, { esSugerencia = false } = {}) {
   const tarjeta = document.createElement("div");
   tarjeta.className = "chat-product-card";
 
@@ -4571,11 +4607,7 @@ function agregarTarjetaProducto(p, { sinInfoEnCarrito = false } = {}) {
         p.nombre ?? "Producto",
         precio,
         p.codigo ?? "",
-        // 🔗 Cuando esta tarjeta se muestra como sugerencia/relacionado
-        // (sinInfoEnCarrito = true), se agrega al carrito SIN el texto de
-        // "info" para que el ítem quede con una etiqueta corta y limpia
-        // en el carrito, el recibo y la cotización.
-        sinInfoEnCarrito ? "" : (p.info ?? ""),
+        p.info ?? "",
         tarifa
       );
       // Feedback visual breve
@@ -4591,7 +4623,12 @@ function agregarTarjetaProducto(p, { sinInfoEnCarrito = false } = {}) {
       // configurados en el catálogo, se muestran aquí mismo como nuevas
       // tarjetas dentro de la conversación (antes solo aparecían en el
       // panel del carrito, que muchas veces no está a la vista).
-      if (!sinInfoEnCarrito) mostrarSugerenciasEnChat(p.codigo);
+      // 💡 Si el producto agregado desde el chat tiene relacionados
+      // configurados en el catálogo, se muestran aquí mismo como nuevas
+      // tarjetas dentro de la conversación. Solo se hace para la tarjeta
+      // "original" (no para una tarjeta que ya es en sí misma una
+      // sugerencia), para no encadenar sugerencias de sugerencias.
+      if (!esSugerencia) mostrarSugerenciasEnChat(p.codigo);
     });
   });
 
@@ -4603,8 +4640,10 @@ function agregarTarjetaProducto(p, { sinInfoEnCarrito = false } = {}) {
 // 💡 NUEVO: muestra, dentro de la conversación del chat, los productos
 // relacionados (relacionado1-4) del producto que se acaba de agregar.
 // Reutiliza la misma búsqueda que el panel de sugerencias del carrito
-// (buscarProductosRelacionados) para no duplicar lógica. Los productos
-// sugeridos se agregan SIN el texto de "info" (sinInfoEnCarrito: true).
+// (buscarProductosRelacionados) para no duplicar lógica. Se agregan al
+// carrito de forma NORMAL (con su info completa, como cualquier otro
+// producto) — la venta y el recibo no cambian; lo único distinto es que
+// no vuelven a encadenar más sugerencias (ver esSugerencia).
 function mostrarSugerenciasEnChat(code) {
   const producto = productosData.find(p => p.code === code);
   const relacionados = buscarProductosRelacionados(producto);
@@ -4622,7 +4661,7 @@ function mostrarSugerenciasEnChat(code) {
         precio: p.price,
         precio_taller: p.priceDesc,
       },
-      { sinInfoEnCarrito: true }
+      { esSugerencia: true }
     );
   });
 }

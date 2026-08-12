@@ -3585,7 +3585,11 @@ function mostrarSugerencias(code) {
 
     r.items.forEach((i, idx) => {
       if (idx > 0) texto(lineaDeGuiones(ancho)); // línea divisoria entre productos
-      const descripcion = `${i.qty}x ${i.label || i.name}`;
+      // 🖨️ NUEVO: en el recibo impreso (térmico) ya no se muestra la
+      // "info" larga del producto, solo código + nombre. La venta y los
+      // datos guardados en el backend no cambian, esto es solo cómo se ve
+      // el ticket físico.
+      const descripcion = `${i.qty}x ${buildProductLabel(i.code, i.name, "")}`;
       const precioTexto = formatCurrency(signo * i.qty * i.price);
       imprimirFilaProducto(cmds, negrita, descripcion, precioTexto, ancho);
     });
@@ -3693,9 +3697,13 @@ function mostrarSugerencias(code) {
     const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
+    // 🖨️ NUEVO: igual que en el recibo térmico, aquí tampoco se muestra la
+    // "info" larga — solo código + nombre. Esto es lo que se ve en
+    // pantalla (#reciboPrint) y lo que sale al imprimir por navegador
+    // (imprimirRecibo -> window.print()), así que el ajuste cubre ambos.
     const filasHtml = r.items.map(i => `
       <tr>
-        <td>${i.qty}x ${i.label || i.name}</td>
+        <td>${i.qty}x ${buildProductLabel(i.code, i.name, "")}</td>
         <td style="text-align:right; white-space:nowrap;">${formatCurrency(signo * i.qty * i.price)}</td>
       </tr>
     `).join("");

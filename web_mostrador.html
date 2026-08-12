@@ -2333,18 +2333,47 @@ function sincronizarCarritoConCatalogo() {
   if (huboCambios || itemsInvalidos.length > 0) updateCartDisplay();
 }
 
+// 🔗 Busca los productos relacionados de un producto dado, ya filtrados
+// (con stock, sin duplicados, sin los que ya están en el carrito) y
+// resueltos por CÓDIGO primero (más robusto) y por nombre como respaldo.
+// Se usa tanto para el panel de sugerencias del carrito como para las
+// sugerencias que se muestran dentro del chat.
+function buscarProductosRelacionados(producto) {
+  if (!producto || !producto.relacionados || producto.relacionados.length === 0) return [];
+
+  const codigosYaAgregados = new Set();
+  return producto.relacionados
+    .map(r => {
+      const clave = r.toString().trim();
+      const porCodigo = productosData.find(
+        p => p.code && p.code.toString().trim().toLowerCase() === clave.toLowerCase()
+      );
+      const encontrado = porCodigo || productosData.find(p => p.name === clave);
+      if (!encontrado) {
+        // 🩺 Ayuda a detectar errores de tipeo en la hoja: si "clave" no
+        // coincide con ningún código ni nombre del catálogo, la
+        // sugerencia se pierde en silencio. Este aviso solo lo ve quien
+        // abra la consola del navegador (no molesta al cliente).
+        console.warn(`⚠️ "relacionado" no encontrado para "${producto.name}" (código ${producto.code}): "${clave}" no coincide con ningún código ni nombre del catálogo.`);
+      }
+      return encontrado;
+    })
+    // Evita mostrar el mismo producto relacionado dos veces si dos
+    // columnas (por ejemplo relacionado1 y relacionado3) terminan
+    // apuntando al mismo código.
+    .filter(p => {
+      if (!p || p.stock <= 0 || cart.find(c => c.code === p.code)) return false;
+      if (codigosYaAgregados.has(p.code)) return false;
+      codigosYaAgregados.add(p.code);
+      return true;
+    });
+}
+
 function mostrarSugerencias(code) {
   const producto = productosData.find(p => p.code === code);
   const panel = document.getElementById("sugerenciasPanel");
 
-  if (!producto || producto.relacionados.length === 0) {
-    panel.style.display = "none";
-    return;
-  }
-
-  const relacionados = producto.relacionados
-    .map(r => productosData.find(p => p.name === r))
-    .filter(p => p && p.stock > 0 && !cart.find(c => c.code === p.code));
+  const relacionados = buscarProductosRelacionados(producto);
 
   if (relacionados.length === 0) {
     panel.style.display = "none";
@@ -2377,7 +2406,7 @@ function mostrarSugerencias(code) {
               ${formatCurrency(precioMostrar)}
             </p>
           </div>
-          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '${(p.info || "").replace(/'/g,"\\'")}')"
+          <button onclick="addToCart('${p.name.replace(/'/g,"\\'")}', '${precioMostrar}', '${(p.code || "").replace(/'/g,"\\'")}', '')"
                   style="background:linear-gradient(90deg,#00b09b,#96c93d); color:white;
                         border:none; padding:5px 8px; border-radius:6px; cursor:pointer;
                         font-size:12px; flex-shrink:0;">
@@ -4491,7 +4520,7 @@ function agregarBurbuja(texto, tipo) {
 }
 
 
-function agregarTarjetaProducto(p) {
+function agregarTarjetaProducto(p, { sinInfoEnCarrito = false } = {}) {
   const tarjeta = document.createElement("div");
   tarjeta.className = "chat-product-card";
 
@@ -4542,7 +4571,11 @@ function agregarTarjetaProducto(p) {
         p.nombre ?? "Producto",
         precio,
         p.codigo ?? "",
-        p.info ?? "",
+        // 🔗 Cuando esta tarjeta se muestra como sugerencia/relacionado
+        // (sinInfoEnCarrito = true), se agrega al carrito SIN el texto de
+        // "info" para que el ítem quede con una etiqueta corta y limpia
+        // en el carrito, el recibo y la cotización.
+        sinInfoEnCarrito ? "" : (p.info ?? ""),
         tarifa
       );
       // Feedback visual breve
@@ -4553,12 +4586,45 @@ function agregarTarjetaProducto(p) {
         btn.textContent = original;
         btn.disabled = stock === 0;
       }, 1000);
+
+      // 💡 NUEVO: si el producto agregado desde el chat tiene relacionados
+      // configurados en el catálogo, se muestran aquí mismo como nuevas
+      // tarjetas dentro de la conversación (antes solo aparecían en el
+      // panel del carrito, que muchas veces no está a la vista).
+      if (!sinInfoEnCarrito) mostrarSugerenciasEnChat(p.codigo);
     });
   });
 
   chatMessages.appendChild(tarjeta);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return tarjeta;
+}
+
+// 💡 NUEVO: muestra, dentro de la conversación del chat, los productos
+// relacionados (relacionado1-4) del producto que se acaba de agregar.
+// Reutiliza la misma búsqueda que el panel de sugerencias del carrito
+// (buscarProductosRelacionados) para no duplicar lógica. Los productos
+// sugeridos se agregan SIN el texto de "info" (sinInfoEnCarrito: true).
+function mostrarSugerenciasEnChat(code) {
+  const producto = productosData.find(p => p.code === code);
+  const relacionados = buscarProductosRelacionados(producto);
+  if (relacionados.length === 0) return;
+
+  agregarBurbuja("💡 También te recomendamos:", "bot");
+  relacionados.forEach(p => {
+    agregarTarjetaProducto(
+      {
+        nombre: p.name,
+        codigo: p.code,
+        info: p.info,
+        marca: p.marca,
+        stock: p.stock,
+        precio: p.price,
+        precio_taller: p.priceDesc,
+      },
+      { sinInfoEnCarrito: true }
+    );
+  });
 }
 
 function enviarMensaje() {

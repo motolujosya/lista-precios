@@ -1368,6 +1368,15 @@
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzumlTHwgMOANtajyuNe-TSW5CZzMXge8F1xPd-oZDRVg6wpWOWmYkCfelXvlKbBGNG8Q/exec";
+  // 🌐 NUEVO: dominio del túnel de Cloudflare que expone el backend del
+  // chat (WebSocket + endpoints auxiliares como la descarga de Excel).
+  // Antes esta URL estaba repetida (y desincronizada) en dos lugares del
+  // archivo. Los túneles gratuitos de trycloudflare.com generan una URL
+  // NUEVA cada vez que el proceso del backend se reinicia — así que si el
+  // chat empieza a desconectarse en loop o la descarga de Excel falla,
+  // lo primero a revisar es si este valor sigue siendo el túnel vigente,
+  // y actualizarlo AQUÍ (una sola vez, no en cada lugar donde se use).
+  const BACKEND_TUNNEL_HOST = "literature-locale-adjustable-stuffed.trycloudflare.com";
   // 🔐 NUEVO: clave compartida que se manda en cada request al Apps Script
   // (campo "apiKey"). Debe ser EXACTAMENTE el mismo valor que guardaste en
   // Script Properties bajo el nombre "API_KEY" en el editor de Apps Script.
@@ -2957,7 +2966,7 @@ function mostrarSugerencias(code) {
     btn.disabled = true;
     btn.textContent = "⏳";
     try {
-      const resp = await fetch("https://advocate-usage-contribution-picnic.trycloudflare.com/api/descargar-consultas-fallidas/excel", {
+      const resp = await fetch(`https://${BACKEND_TUNNEL_HOST}/api/descargar-consultas-fallidas/excel`, {
         method: "GET"
       });
 
@@ -4443,7 +4452,7 @@ let mensajePendiente = null;
 function conectarWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  ws = new WebSocket(`wss://attraction-oriental-projects-seeing.trycloudflare.com/ws/${clientId}`);
+  ws = new WebSocket(`wss://${BACKEND_TUNNEL_HOST}/ws/${clientId}`);
 
   ws.onopen = () => {
     console.log("✅ Conectado al chat:", clientId);
@@ -4465,8 +4474,16 @@ function conectarWS() {
     }
   };
 
-  ws.onclose = () => {
-    console.warn("⚠️ WebSocket cerrado. Reconectando en 3s...");
+  ws.onclose = (event) => {
+    // 🩺 NUEVO: antes se descartaba el evento de cierre y solo se avisaba
+    // "WebSocket cerrado", sin decir por qué. Ahora se registra el código
+    // y motivo de cierre que manda el servidor/navegador — esto es clave
+    // para diferenciar, por ejemplo, un túnel caído (código 1006, cierre
+    // "anormal", típico de trycloudflare.com) de un cierre normal del
+    // servidor (1000/1001) o un rechazo explícito (1008, 1011, etc.).
+    console.warn(
+      `⚠️ WebSocket cerrado (code=${event.code}, reason="${event.reason || "sin motivo"}", limpio=${event.wasClean}). Reconectando en 3s...`
+    );
     clearInterval(pingInterval);
     if (!wsReconectando) {
       wsReconectando = true;

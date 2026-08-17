@@ -267,6 +267,43 @@
   .close-cart { background: linear-gradient(90deg, #ff4d4d, #ff6a00); color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
   .cart-total { font-weight: bold; margin-top: 10px; }
 
+  /* Secciones plegables del carrito */
+  .cart-collapsible {
+    margin-top: 10px;
+    padding: 0;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    overflow: hidden;
+  }
+  .cart-collapsible > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #555;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cart-collapsible > summary::-webkit-details-marker { display: none; }
+  .cart-collapsible > summary::after {
+    content: "＋";
+    font-size: 16px;
+    color: #777;
+  }
+  .cart-collapsible[open] > summary::after { content: "−"; }
+  .cart-collapsible-body {
+    padding: 0 10px 10px;
+  }
+
+  /* La calculadora de cambio solo aparece para pagos en efectivo. */
+  body.is-admin .pago-efectivo-only.cambio-oculto {
+    display: none !important;
+  }
+
   .cart-actions {
     display: flex;
     flex-wrap: wrap;
@@ -353,16 +390,6 @@
   .mini-foto { max-width: 150px; max-height: 100px; object-fit: contain; border-radius: 10px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
   .mini-foto.placeholder { display: flex; justify-content: center; align-items: center; background: #f2f2f2; color: #888; font-size: 28px; }
 
-  /* Modal resumen */
-  #summaryModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
-  #summaryContent { background: #fff; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; animation: fadeIn 0.3s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-  #summaryTable { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  #summaryTable th, #summaryTable td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-  #summaryButtons { text-align: right; }
-  #summaryButtons button { margin-left: 8px; padding: 6px 10px; border-radius: 6px; color: #fff; border: none; cursor: pointer; }
-  .copy-summary { background: #007bff; }
-  .close-summary { background: #ff4d4d; }
 
   /* Modal pedidos guardados */
   #quotesModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
@@ -1009,6 +1036,226 @@
   }
   #chatSendBtn:hover { transform: scale(1.05); }
   #chatSendBtn:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ===== Paneles desplegables del carrito ===== */
+.cart-collapsible {
+  margin-top: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.cart-collapsible-header {
+  width: 100%;
+  border: 0;
+  background: #f8f9fa;
+  color: #444;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  transition: background .15s ease, color .15s ease;
+}
+
+.cart-collapsible-header:hover {
+  background: #eef2f5;
+  color: #222;
+}
+
+.cart-collapsible-header:focus-visible {
+  outline: 2px solid #007bff;
+  outline-offset: -2px;
+}
+
+.cart-collapsible-icon {
+  font-size: 18px;
+  line-height: 1;
+  min-width: 20px;
+  text-align: center;
+  transition: transform .15s ease;
+}
+
+.cart-collapsible.open .cart-collapsible-icon {
+  transform: rotate(180deg);
+}
+
+.cart-collapsible-content {
+  display: none;
+  padding: 0 10px 10px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.cart-collapsible.open .cart-collapsible-content {
+  display: block;
+}
+
+
+/* 🛒 Animación al agregar un producto */
+.add-btn.btn-agregado {
+  animation: botonAgregado .35s ease;
+  background: #eafaf0 !important;
+  border-color: #28a745 !important;
+  color: #218838 !important;
+}
+
+.add-btn.btn-agregado-pulse {
+  animation: carritoPulse .45s ease;
+}
+
+@keyframes botonAgregado {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes carritoPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+
+/* 🎨 Botones modernos de las tarjetas */
+.card-actions-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.card-actions-buttons .add-btn,
+.card-actions-buttons .copy-btn {
+  min-height: 40px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+
+/* 🛒 Agregar: botón principal */
+.card-actions-buttons .add-btn {
+  flex: 1;
+  border: 1.5px solid #cfd5da;
+  background: #fff;
+  color: #343a40;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+}
+
+.card-actions-buttons .add-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .12);
+  background: #f5f6f7;
+  border-color: #aeb6bd;
+}
+
+.card-actions-buttons .add-btn:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+/* 📋 Copiar: botón secundario */
+.card-actions-buttons .copy-btn {
+  flex: 1;
+  border: 1.5px solid #d5dbe0;
+  background: #fff;
+  color: #5f6870;
+  box-shadow: none;
+}
+
+.card-actions-buttons .copy-btn:hover {
+  transform: translateY(-1px);
+  background: #f5f7f8;
+  border-color: #b9c1c7;
+  color: #333;
+}
+
+.card-actions-buttons .copy-btn:active {
+  transform: scale(.97);
+}
+
+/* Estado "Agregado" conserva el protagonismo del botón */
+.card-actions-buttons .add-btn.btn-agregado {
+  background: #f1f3f5 !important;
+  border-color: #adb5bd !important;
+  color: #343a40 !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .10);
+}
+
+
+/* ⬛ Botones de tarjeta: cuadrados, tamaño fijo y centrados */
+.product-card .card-actions-buttons {
+  justify-content: center !important;
+  align-items: center;
+  width: 100%;
+}
+
+.product-card .card-actions-buttons .add-btn,
+.product-card .card-actions-buttons .copy-btn {
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
+}
+
+/* 🖥️ En la vista de lista también quedan centrados */
+.product-grid.list-view .card-actions-buttons {
+  justify-content: center !important;
+}
+
+/* 📐 Solo escritorio/web: cuando se abre el carrito o chat,
+   el contenido principal se desplaza para que el panel no lo tape.
+   En móvil no se aplica porque el panel ocupa toda la pantalla. */
+@media screen and (min-width: 701px) {
+  body.lateral-panel-open {
+    padding-right: 340px;
+    box-sizing: border-box;
+    transition: padding-right .3s ease;
+  }
+
+  body.lateral-panel-open .product-grid,
+  body.lateral-panel-open .search-bar {
+    transition: padding-right .3s ease;
+  }
+}
+
+
+/* 💲 Caja de precio: ancho suficiente para mostrar el precio completo */
+.product-card .card-actions select {
+  width: 240px !important;
+  min-width: 240px;
+  max-width: 240px;
+  display: block;
+  margin: 0 auto 8px auto !important;
+  padding: 8px 34px 8px 12px;
+  font-size: 15px;
+  line-height: 1.3;
+  box-sizing: border-box;
+}
+
+
+/* 🔐 Elementos exclusivos del administrador */
+.admin-only {
+  display: none;
+}
+body.admin-logged-in .admin-only {
+  display: block;
+}
+
 </style>
 </head>
 <body>
@@ -1033,7 +1280,7 @@
     <button class="icon-btn" data-tooltip="Buscar recibos" onclick="abrirBuscarRecibos()" aria-label="Buscar recibos">🔎</button>
     <span class="tool-bar-label">Recibos</span>
   </div>
-  <div class="tool-bar-item">
+  <div class="tool-bar-item admin-only">
     <button class="icon-btn" id="pedidoFloatBtn" data-tooltip="Agregar faltante" onclick="abrirModalPedido()" aria-label="Agregar faltante">📝</button>
     <span class="tool-bar-label">Faltante</span>
   </div>
@@ -1067,12 +1314,11 @@
     <span>Descuento:</span><span id="cartDiscountAmount">-$0</span>
   </div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
-
   <!-- Ajustar total del carrito: por porcentaje de descuento o valor manual -->
-  <div id="descuentoCarrito" class="admin-only-block" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
-    <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">💲 Ajustar total del carrito</div>
-
-    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+  <details id="descuentoCarrito" class="admin-only-block cart-collapsible">
+    <summary>💲 Ajustar total del carrito</summary>
+    <div class="cart-collapsible-body">
+<div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
       <label for="descuentoPorcentaje" style="font-size: 12px; color: #555; flex: 1;">Descuento %</label>
       <input id="descuentoPorcentaje" type="number" min="0" max="100" step="1" placeholder="0"
         style="width: 70px; padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc; text-align: right; box-sizing: border-box;">
@@ -1088,11 +1334,14 @@
     <div id="totalManualFormateado" style="text-align: right; font-size: 11px; color: #888; margin-bottom: 6px;">$0</div>
 
     <button id="quitarDescuentoBtn" style="width: 100%; padding: 5px 6px; border: none; border-radius: 6px; background: #eee; color: #555; cursor: pointer; font-size: 12px;">↩️ Quitar descuento / restaurar total</button>
-  </div>
-
+  
+    </div>
+  </details>
   <!-- Datos del cliente para el recibo -->
-  <div id="datosCliente" class="admin-only-block" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
-    <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px;">🧾 Datos del cliente</div>
+  <details id="datosCliente" class="admin-only-block cart-collapsible">
+    <summary>🧾 Datos del cliente</summary>
+    <div class="cart-collapsible-body">
+
     <div style="position: relative;">
       <input id="clienteNombre" placeholder="Nombre del cliente" autocomplete="off"
         oninput="buscarClienteSugerencias()" onfocus="buscarClienteSugerencias()"
@@ -1104,12 +1353,13 @@
         <input id="clienteTel" placeholder="Teléfono" style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; min-width: 0;">
       </div>
       <div id="clienteSugerencias" class="cliente-sugerencias"></div>
+    
     </div>
-  </div>
+  </details>
   <!-- La forma de pago es obligatoria para CUALQUIER venta, así que se
        mantiene siempre visible (no va dentro del bloque admin-only de
        "Datos del cliente"), o nadie sin login podría finalizar una compra. -->
-  <div style="margin-top: 12px;">
+  <div class="admin-only" style="margin-top: 12px;">
     <select id="formaPago" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
       <option value="" selected>-- Selecciona forma de pago --</option>
       <option value="Efectivo">💵 Efectivo</option>
@@ -1118,7 +1368,7 @@
     </select>
   </div>
   <!-- NUEVO: Calculadora de cambio -->
-  <div id="pagoCalculadora" class="admin-only-block" style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+  <div id="pagoCalculadora" class="admin-only-block pago-efectivo-only" style="display:none; margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
       <label for="pagoCliente" style="font-size: 13px; font-weight: bold; color: #555;">Paga con:</label>
       <input id="pagoCliente" type="number" placeholder="0" style="width: 120px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; text-align: right;">
@@ -1133,10 +1383,6 @@
   <div id="sugerenciasPanel" style="display:none; margin-top:12px; padding-top:10px;
      border-top:1px solid #eee;"></div>
   <div class="cart-actions">
-    <div class="cart-action-item">
-      <button id="viewSummaryBtn" class="icon-btn" data-tooltip="Resumen" aria-label="Resumen">🧾</button>
-      <span class="cart-action-label">Resumen</span>
-    </div>
     <div class="cart-action-item">
       <button id="cotizacionBtn" class="icon-btn" data-tooltip="Cotización" aria-label="Cotización">🖨️</button>
       <span class="cart-action-label">Cotización</span>
@@ -1246,17 +1492,6 @@
     <button id="confirmarDevolucionBtn" onclick="confirmarDevolucion()" style="margin-top:14px; width:100%; background: linear-gradient(90deg, #ff9800, #ff5722); color:#fff; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold;">Confirmar devolución</button>
   </div>
 </div>
-
-<!-- Modal Resumen -->
-<div id="summaryModal">
-  <div id="summaryContent">
-    <h3>Resumen del pedido</h3>
-    <table id="summaryTable"></table>
-    <div id="summaryButtons">
-      <button class="copy-summary" id="copySummaryBtn">Copiar</button>
-      <button class="close-summary" id="closeSummaryBtn">Cerrar</button>
-    </div>
-  </div>
 </div>
 
 <!-- Modal Historial -->
@@ -1630,8 +1865,8 @@
             <option value="${priceDesc}" class="admin-only-block">Precio Taller: ${formatCurrency(priceDesc)}</option>
           </select>
           <div class="card-actions-buttons">
-            <button class="add-btn" ${stock === 0 ? "disabled" : ""}>Agregar</button>
-            <button class="copy-btn">Copiar</button>
+            <button class="add-btn" ${stock === 0 ? "disabled" : ""} title="Agregar al carrito" aria-label="Agregar al carrito">🛒</button>
+            <button class="copy-btn" title="Copiar para WhatsApp" aria-label="Copiar para WhatsApp">📋</button>
           </div>
           ${link ? `<p class="admin-only-block"><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
         </div>
@@ -1645,16 +1880,52 @@
           showToast(`⚠️ No hay más stock disponible de "${name}"`);
           return;
         }
+
         const select = card.querySelector("select");
         const tarifaSeleccionada = select.selectedIndex === 1 ? "taller" : "publico";
         addToCart(name, select.value, code, info, tarifaSeleccionada);
+
+        // ✨ Feedback visual: cambia temporalmente a "Agregado".
+        const botonAgregar = card.querySelector(".add-btn");
+        const textoOriginal = "🛒";
+        botonAgregar.textContent = "✅";
+        botonAgregar.classList.add("btn-agregado");
+
+        // Evita acumular temporizadores si se pulsa rápidamente.
+        clearTimeout(botonAgregar._agregadoTimer);
+        botonAgregar._agregadoTimer = setTimeout(() => {
+          botonAgregar.textContent = textoOriginal;
+          botonAgregar.classList.remove("btn-agregado");
+        }, 1000);
       };
 
-      card.querySelector(".copy-btn").onclick = () => {
+      card.querySelector(".copy-btn").onclick = async () => {
         const val = card.querySelector("select").value;
-        const texto = buildProductLabel(code, name, info);
-        navigator.clipboard.writeText(`${buildProductLabel(code, name, info)} - ${formatCurrency(val)}`);
-        card.querySelector(".copy-btn").textContent = "✅ Copiado";
+        const texto = armarTextoProductoWhatsapp(code, name, val);
+
+        try {
+          await navigator.clipboard.writeText(texto);
+          card.querySelector(".copy-btn").textContent = "✅ Copiado";
+        } catch (e) {
+          // Respaldo para navegadores sin permiso de portapapeles moderno.
+          const temp = document.createElement("textarea");
+          temp.value = texto;
+          temp.style.position = "fixed";
+          temp.style.opacity = "0";
+          document.body.appendChild(temp);
+          temp.focus();
+          temp.select();
+
+          try {
+            document.execCommand("copy");
+            card.querySelector(".copy-btn").textContent = "✅ Copiado";
+          } catch (e2) {
+            alert("No se pudo copiar automáticamente. Copia el texto manualmente:\n\n" + texto);
+          }
+
+          document.body.removeChild(temp);
+        }
+
         setTimeout(() => card.querySelector(".copy-btn").textContent = "Copiar", 1200);
       };
 
@@ -1662,6 +1933,12 @@
     });
   }
 
+
+  // 📋 Formato WhatsApp para copiar un producto individual desde una tarjeta.
+  // Mantiene el mismo estilo de las líneas de la cotización y NO incluye "info".
+  function armarTextoProductoWhatsapp(code, name, price) {
+    return `1x ${buildProductLabel(code, name, "")} - ${formatCurrency(price)}`;
+  }
 
   function formatCurrency(num) {
 
@@ -2500,6 +2777,28 @@ function mostrarSugerencias(code) {
     
     inputPago.oninput = calcularCambio;
     calcularCambio(); // Ejecutar al actualizar el carrito
+
+    // 💵 La calculadora de cambio solo se muestra cuando la forma de pago es Efectivo.
+    const formaPagoSelect = document.getElementById("formaPago");
+    const pagoCalculadora = document.getElementById("pagoCalculadora");
+
+    function actualizarVisibilidadCambio() {
+      const esEfectivo = formaPagoSelect.value === "Efectivo";
+      pagoCalculadora.classList.toggle("cambio-oculto", !esEfectivo);
+      if (!esEfectivo) {
+        inputPago.value = "";
+        txtFormateado.textContent = "$0";
+        txtCambio.textContent = "$0";
+        txtCambio.style.color = "#28a745";
+      }
+    }
+
+    // Se registra una sola vez.
+    if (!formaPagoSelect.dataset.cambioListener) {
+      formaPagoSelect.addEventListener("change", actualizarVisibilidadCambio);
+      formaPagoSelect.dataset.cambioListener = "1";
+    }
+    actualizarVisibilidadCambio();
   }
 
   function updateCartCount() {
@@ -3799,8 +4098,10 @@ function mostrarSugerencias(code) {
     const esCotizacion = r.tipo === "Cotizacion";
     const signo = esDevolucion ? -1 : 1;
 
+    // WhatsApp muestra únicamente código + nombre + precio.
+    // La "info" interna del producto no se copia.
     const lineasProductos = r.items
-      .map(i => `${i.qty}x ${i.label || i.name} - ${formatCurrency(signo * i.qty * i.price)}`)
+      .map(i => `${i.qty}x ${buildProductLabel(i.code, i.name, "")} - ${formatCurrency(signo * i.qty * i.price)}`)
       .join("\n");
 
     let texto = esDevolucion
@@ -3931,6 +4232,24 @@ function mostrarSugerencias(code) {
   document.getElementById("clienteDoc").addEventListener("blur", () => {
     setTimeout(() => document.getElementById("clienteSugerencias").classList.remove("visible"), 150);
   });
+
+
+  // ===== Desplegables del carrito =====
+  function configurarDesplegableCarrito(id) {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+
+    const boton = panel.querySelector(".cart-collapsible-header");
+    if (!boton) return;
+
+    boton.addEventListener("click", () => {
+      const abierto = panel.classList.toggle("open");
+      boton.setAttribute("aria-expanded", abierto ? "true" : "false");
+    });
+  }
+
+  configurarDesplegableCarrito("descuentoCarrito");
+  configurarDesplegableCarrito("datosCliente");
 
   // ✅ Finalizar compra
   document.getElementById("checkoutBtn").onclick = async () => {
@@ -4343,43 +4662,7 @@ function parseFechaSheet(val) {
     document.getElementById("historialHasta").value = "";
     renderHistorial();
   }
-
-  // Resumen modal
-  document.getElementById("viewSummaryBtn").onclick = () => {
-    const table = document.getElementById("summaryTable");
-    table.innerHTML = "<tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr>";
-    cart.forEach(i => {
-      table.innerHTML += `<tr><td>${i.label}</td><td>${i.qty}</td><td>${formatCurrency(i.price * i.qty)}</td></tr>`;
-    });
-    const subtotal = getCartSubtotal();
-    const total = getCartTotal();
-    const descuento = subtotal - total;
-    if (descuento > 0) {
-      table.innerHTML += `<tr><th colspan=2>Subtotal</th><th>${formatCurrency(subtotal)}</th></tr>`;
-      table.innerHTML += `<tr><th colspan=2>Descuento</th><th>-${formatCurrency(descuento)}</th></tr>`;
-    }
-    table.innerHTML += `<tr><th colspan=2>Total</th><th>${formatCurrency(total)}</th></tr>`;
-    document.getElementById("summaryModal").style.display = "flex";
-  };
-
-  document.getElementById("closeSummaryBtn").onclick = () => document.getElementById("summaryModal").style.display = "none";
-
-  document.getElementById("copySummaryBtn").onclick = () => {
-    let text = "🧾 Resumen del pedido:\n";
-    cart.forEach(i => text += `- ${i.label} x${i.qty} — ${formatCurrency(i.price * i.qty)}\n`);
-    const subtotal = getCartSubtotal();
-    const total = getCartTotal();
-    const descuento = subtotal - total;
-    if (descuento > 0) {
-      text += `Subtotal: ${formatCurrency(subtotal)}\n`;
-      text += `Descuento: -${formatCurrency(descuento)}\n`;
-    }
-    text += `TOTAL: ${formatCurrency(total)}`;
-    navigator.clipboard.writeText(text);
-    showToast("✅ Resumen copiado al portapapeles");
-  };
-
-  // Toast
+// Toast
   function showToast(msg) {
     const t = document.getElementById("toast");
     t.textContent = msg;
@@ -4436,7 +4719,14 @@ const chatSendBtn = document.getElementById("chatSendBtn");
 // abran o cierren los paneles.
 function actualizarBloqueoScrollFondo() {
   const algunoAbierto = cartPanel.classList.contains("open") || chatPanel.classList.contains("open");
+
+  // Mantiene el comportamiento existente de bloqueo del scroll.
   document.body.style.overflow = algunoAbierto ? "hidden" : "";
+
+  // En escritorio, desplaza el contenido principal para que el carrito/chat
+  // no tape la página. En móvil NO se desplaza porque el panel ocupa toda
+  // la pantalla.
+  document.body.classList.toggle("lateral-panel-open", algunoAbierto);
 }
 new MutationObserver(actualizarBloqueoScrollFondo).observe(cartPanel, { attributes: true, attributeFilter: ["class"] });
 new MutationObserver(actualizarBloqueoScrollFondo).observe(chatPanel, { attributes: true, attributeFilter: ["class"] });

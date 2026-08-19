@@ -1797,8 +1797,19 @@ body.admin-logged-in .admin-only {
     grid.innerHTML = "";
     productosData = [];
 
+    // 🔤📦 Orden de la grilla: primero todos los productos CON stock,
+    // ordenados alfabéticamente (A-Z); y al final los que están SIN stock,
+    // también ordenados alfabéticamente. Antes se ordenaba solo por nombre,
+    // así que un producto agotado podía aparecer mezclado entre los que sí
+    // tienen stock si su nombre iba antes en el alfabeto.
+    const iProd = cols.indexOf("producto");
+    const iStock = cols.indexOf("inventario");
     rows.sort((a, b) => {
-      const iProd = cols.indexOf("producto");
+      const stockA = parseInt(a[iStock]) || 0;
+      const stockB = parseInt(b[iStock]) || 0;
+      const sinStockA = stockA === 0 ? 1 : 0;
+      const sinStockB = stockB === 0 ? 1 : 0;
+      if (sinStockA !== sinStockB) return sinStockA - sinStockB; // con stock (0) antes que sin stock (1)
       return (a[iProd] || "").toString().toLowerCase().localeCompare((b[iProd] || "").toString().toLowerCase());
     });
 
@@ -1865,7 +1876,7 @@ body.admin-logged-in .admin-only {
             <option value="${priceDesc}" class="admin-only-block">Precio Taller: ${formatCurrency(priceDesc)}</option>
           </select>
           <div class="card-actions-buttons">
-            <button class="add-btn" ${stock === 0 ? "disabled" : ""} title="Agregar al carrito" aria-label="Agregar al carrito">🛒</button>
+            <button class="add-btn" ${stock === 0 ? "disabled" : ""} title="${stock === 0 ? "Sin stock disponible" : "Agregar al carrito"}" aria-label="${stock === 0 ? "Sin stock disponible" : "Agregar al carrito"}">${stock === 0 ? "🚫" : "🛒"}</button>
             <button class="copy-btn" title="Copiar para WhatsApp" aria-label="Copiar para WhatsApp">📋</button>
           </div>
           ${link ? `<p class="admin-only-block"><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
@@ -2655,13 +2666,32 @@ function buscarProductosRelacionados(producto) {
     });
 }
 
-function mostrarSugerencias(code) {
-  const producto = productosData.find(p => p.code === code);
+// 🗂️ Acumula las sugerencias mostradas durante la sesión de venta actual,
+// para que al agregar un segundo (o tercer...) producto no se borren las
+// recomendaciones anteriores: se van sumando. La clave es el código del
+// producto sugerido, para no repetir la misma tarjeta dos veces aunque
+// varios productos del carrito la sugieran. Se reinicia junto con el
+// carrito (ver vaciarCarrito / limpiarCarritoInterno, etc. que llaman a
+// reiniciarSugerenciasAcumuladas()).
+const sugerenciasAcumuladas = new Map();
+
+function reiniciarSugerenciasAcumuladas() {
+  sugerenciasAcumuladas.clear();
+  const panel = document.getElementById("sugerenciasPanel");
+  if (panel) panel.style.display = "none";
+}
+
+function renderSugerenciasPanel() {
   const panel = document.getElementById("sugerenciasPanel");
 
-  const relacionados = buscarProductosRelacionados(producto);
+  // 🚫 Cualquier sugerencia que mientras tanto haya sido agregada al
+  // carrito (o que se haya quedado sin stock) ya no debe seguir
+  // ofreciéndose.
+  for (const [code, p] of sugerenciasAcumuladas) {
+    if (p.stock <= 0 || cart.find(c => c.code === code)) sugerenciasAcumuladas.delete(code);
+  }
 
-  if (relacionados.length === 0) {
+  if (sugerenciasAcumuladas.size === 0) {
     panel.style.display = "none";
     return;
   }
@@ -2671,9 +2701,12 @@ function mostrarSugerencias(code) {
     <p style="margin:0 0 8px 0; font-weight:bold; font-size:13px; color:#555;">
       💡 También te recomendamos:
     </p>
-    ${relacionados.map(p => {
+    ${[...sugerenciasAcumuladas.values()].map(p => {
       const precioMostrar = parseFloat(p.price) || parseFloat(p.priceDesc) || 0;
       const fotoUrl = p.foto ? githubRaw(p.foto) : "";
+      // 🏷️ Código y marca, para que quede claro cuál es el producto exacto
+      // (puede haber varios con nombres parecidos de distintas marcas).
+      const codigoMarca = [p.code, p.marca].filter(Boolean).join(" · ");
       return `
         <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
                     border-radius:8px; padding:8px; margin-bottom:6px;">
@@ -2688,6 +2721,13 @@ function mostrarSugerencias(code) {
                       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
               ${p.name}
             </p>
+            ${codigoMarca
+              ? `<p style="margin:1px 0 0; font-size:11px; color:#888;
+                          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  ${codigoMarca}
+                </p>`
+              : ""
+            }
             <p style="margin:2px 0 0; font-size:12px; color:#007bff;">
               ${formatCurrency(precioMostrar)}
             </p>
@@ -2702,6 +2742,20 @@ function mostrarSugerencias(code) {
       `;
     }).join("")}
   `;
+}
+
+function mostrarSugerencias(code) {
+  const producto = productosData.find(p => p.code === code);
+  const relacionados = buscarProductosRelacionados(producto);
+
+  // ➕ Se suman las nuevas sugerencias a las que ya estaban acumuladas
+  // (en vez de reemplazarlas), así el panel va creciendo a medida que se
+  // agregan productos distintos al carrito.
+  relacionados.forEach(p => {
+    if (p && p.code) sugerenciasAcumuladas.set(p.code, p);
+  });
+
+  renderSugerenciasPanel();
 }
 
   function updateCartDisplay() {
@@ -2735,7 +2789,12 @@ function mostrarSugerencias(code) {
           cart.splice(i, 1);
           updateCartDisplay();
           if (cart.length === 0) {
-            document.getElementById("sugerenciasPanel").style.display = "none";
+            reiniciarSugerenciasAcumuladas();
+          } else {
+            // 🔄 El producto que se quitó pudo ser una de las sugerencias ya
+            // agregadas al carrito; se refresca el panel para que, si
+            // corresponde, vuelva a ofrecerse.
+            renderSugerenciasPanel();
           }
         }, 400);
       });
@@ -3441,7 +3500,7 @@ function mostrarSugerencias(code) {
       if (typeof inputPago.oninput === "function") inputPago.oninput();
 
       showToast("🗑️ Carrito vaciado.");
-      document.getElementById("sugerenciasPanel").style.display = "none";
+      reiniciarSugerenciasAcumuladas();
     }
   };
 
@@ -4407,6 +4466,7 @@ function mostrarSugerencias(code) {
     idTransaccionVentaActual = null; // 🔐 esta venta ya quedó confirmada: la próxima debe llevar un ID nuevo
     resetCartAdjustment();
     updateCartDisplay();
+    reiniciarSugerenciasAcumuladas(); // 🧹 nueva venta, nuevas sugerencias desde cero
 
     // Limpia los campos y actualiza los textos visuales tras la compra
     document.getElementById("clienteNombre").value = "";
@@ -4720,8 +4780,15 @@ const chatSendBtn = document.getElementById("chatSendBtn");
 function actualizarBloqueoScrollFondo() {
   const algunoAbierto = cartPanel.classList.contains("open") || chatPanel.classList.contains("open");
 
-  // Mantiene el comportamiento existente de bloqueo del scroll.
-  document.body.style.overflow = algunoAbierto ? "hidden" : "";
+  // 🖥️ En escritorio (misma condición que el media query de
+  // "lateral-panel-open" abajo: min-width 701px) el carrito/chat es un
+  // panel lateral que NO tapa toda la pantalla, así que la página
+  // principal puede seguir con scroll normal. El bloqueo de scroll del
+  // body solo hace falta en móvil, donde el panel sí ocupa toda la
+  // pantalla y sin este bloqueo se producía "scroll chaining" hacia el
+  // fondo.
+  const esEscritorio = window.matchMedia("(min-width: 701px)").matches;
+  document.body.style.overflow = (algunoAbierto && !esEscritorio) ? "hidden" : "";
 
   // En escritorio, desplaza el contenido principal para que el carrito/chat
   // no tape la página. En móvil NO se desplaza porque el panel ocupa toda
@@ -4730,6 +4797,10 @@ function actualizarBloqueoScrollFondo() {
 }
 new MutationObserver(actualizarBloqueoScrollFondo).observe(cartPanel, { attributes: true, attributeFilter: ["class"] });
 new MutationObserver(actualizarBloqueoScrollFondo).observe(chatPanel, { attributes: true, attributeFilter: ["class"] });
+// 🔄 Si la ventana cambia de tamaño (por ejemplo, se gira una tablet o se
+// redimensiona la ventana) con el panel abierto, se re-evalúa si ahora
+// corresponde bloquear el scroll del fondo o no.
+window.addEventListener("resize", actualizarBloqueoScrollFondo);
 
 // Identificador único para esta sesión de chat
 const clientId = crypto.randomUUID();

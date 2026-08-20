@@ -259,7 +259,16 @@
     .cart-panel, #chatPanel { width: 100vw; }
   }
 
-  #cartItems { overflow: visible; }
+  /* 📦 La lista de productos del carrito tiene su PROPIO scroll interno con
+     una altura máxima, en vez de crecer sin límite. Así, cuando se carga un
+     pedido guardado con muchos productos, la lista se desplaza dentro de su
+     propio recuadro y las secciones de abajo (💲 Ajustar total del carrito,
+     🧾 Datos del cliente, forma de pago, botones de acción) se quedan
+     siempre a la vista justo debajo, en vez de quedar empujadas muy abajo y
+     verse amontonadas/perdidas.
+     (Antes decía "overflow: visible", que anulaba por completo el estilo
+     de scrollbar de abajo y dejaba que la lista creciera indefinidamente.) */
+  #cartItems { overflow-y: auto; overflow-x: hidden; max-height: 38vh; }
   #cartItems::-webkit-scrollbar { width: 6px; }
   #cartItems::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
 
@@ -3257,6 +3266,21 @@ function mostrarSugerencias(code) {
 
     cart = itemsValidos;
 
+    // 🔄 NUEVO: al cargar el pedido, se revisan los productos relacionados
+    // de CADA ítem válido (igual que cuando se agrega uno manualmente desde
+    // la grilla o el chat) y se acumulan en el panel "💡 También te
+    // recomendamos", por si conviene sumar algo más antes de cobrar.
+    reiniciarSugerenciasAcumuladas();
+    itemsValidos.forEach(item => {
+      if (!item.code) return;
+      const producto = productosData.find(p => p.code === item.code);
+      if (!producto) return;
+      buscarProductosRelacionados(producto).forEach(p => {
+        if (p && p.code) sugerenciasAcumuladas.set(p.code, p);
+      });
+    });
+    renderSugerenciasPanel();
+
     // 💲 Actualiza cada producto con los datos VIGENTES del catálogo
     // (nombre, info y precio según la tarifa público/taller elegida),
     // en vez de dejarlo "congelado" con lo que tenía cuando se guardó el
@@ -3575,6 +3599,33 @@ function mostrarSugerencias(code) {
     });
   }
 
+  // 🔌 NUEVO: al volver a esta pestaña después de tenerla en segundo plano
+  // (o de que el computador estuviera suspendido), revisamos en silencio
+  // si la conexión con la impresora sigue viva. Como se explica más abajo
+  // en enviarBytesAImpresoraUSB, el navegador NO avisa con "disconnect"
+  // cuando la conexión se cierra por inactividad, así que sin esto el
+  // problema recién se notaba al intentar imprimir. Esto no imprime nada,
+  // solo repara la conexión de antemano para que el próximo recibo salga
+  // a la primera.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (!dispositivoUSB || dispositivoUSB.opened !== false) return;
+    dispositivoUSB.open()
+      .then(async () => {
+        if (dispositivoUSB.configuration === null) await dispositivoUSB.selectConfiguration(1);
+        await dispositivoUSB.claimInterface((buscarEndpointSalida(dispositivoUSB) || {}).interfaz ?? 0);
+      })
+      .catch(() => {
+        // No se pudo reabrir en silencio (por ejemplo, la impresora ya no
+        // está físicamente conectada). Se limpia el estado para que el
+        // próximo intento de impresión pida reconectar de nuevo, en vez de
+        // fallar de forma confusa.
+        dispositivoUSB = null;
+        endpointSalidaUSB = null;
+        actualizarVisibilidadBotonUSB();
+      });
+  });
+
   // Busca, dentro de un dispositivo USB ya abierto, la interfaz y el
   // "endpoint" de salida (por donde se le mandan los datos a imprimir).
   function buscarEndpointSalida(dispositivo) {
@@ -3649,6 +3700,28 @@ function mostrarSugerencias(code) {
     if (!dispositivoUSB) {
       const ok = (await reconectarImpresoraUSBGuardada()) || (await conectarImpresoraUSB());
       if (!ok) return false;
+    } else if (dispositivoUSB.opened === false) {
+      // 🔌 NUEVO: el evento "disconnect" del navegador solo avisa cuando el
+      // cable se desconecta físicamente. Si la pestaña estuvo mucho tiempo
+      // en segundo plano, o el computador se suspendió, la conexión con la
+      // impresora se puede cerrar "en silencio" sin que dispare ese evento:
+      // dispositivoUSB sigue existiendo pero su propiedad .opened queda en
+      // false. Antes esto solo se detectaba cuando fallaba el envío; ahora
+      // se revisa ANTES de imprimir y se reabre la conexión de una vez
+      // (sin pedir permiso de nuevo, porque el dispositivo ya está
+      // autorizado) para que la primera impresión después de la pausa no
+      // falle innecesariamente.
+      try {
+        await dispositivoUSB.open();
+        if (dispositivoUSB.configuration === null) await dispositivoUSB.selectConfiguration(1);
+        await dispositivoUSB.claimInterface((buscarEndpointSalida(dispositivoUSB) || {}).interfaz ?? 0);
+      } catch (e) {
+        console.error("No se pudo reabrir la conexión USB inactiva, se reintentará desde cero:", e);
+        dispositivoUSB = null;
+        endpointSalidaUSB = null;
+        const ok = (await reconectarImpresoraUSBGuardada()) || (await conectarImpresoraUSB());
+        if (!ok) return false;
+      }
     }
     try {
       await dispositivoUSB.transferOut(endpointSalidaUSB, bytes);

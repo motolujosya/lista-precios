@@ -253,6 +253,16 @@
 
   .cart-panel { position: fixed; right: 0; top: 0; height: 100%; width: 340px; background: #fff; box-shadow: -3px 0 10px rgba(0,0,0,0.2); padding: 15px; transform: translateX(100%); transition: transform 0.3s ease; z-index: 1000; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
   .cart-panel.open { transform: translateX(0); }
+  /* 🗜️ Por defecto, un elemento hijo de un contenedor flex se puede ENCOGER
+     para caber en el espacio disponible (flex-shrink: 1). Eso era lo que
+     causaba que "Ajustar total del carrito", "Datos del cliente", el panel
+     de sugerencias y los botones de acción se vieran comprimidos/superpuestos
+     cuando el carrito tenía muchos productos: el navegador los achicaba en
+     vez de simplemente hacer scroll. Con flex-shrink: 0, cada sección
+     mantiene su tamaño natural completo, y si no caben todas a la vez, es
+     el panel completo el que se desplaza hacia abajo (ya tiene
+     overflow-y: auto arriba) — nunca se comprimen entre sí. */
+  .cart-panel > * { flex-shrink: 0; }
   @media (max-width: 420px) {
     /* En celulares angostos, el carrito y el chat ocupan toda la pantalla
        en vez de desbordarse a los costados con un ancho fijo de escritorio. */

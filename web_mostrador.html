@@ -640,6 +640,26 @@
   .historial-filtros button { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; height: 33px; }
   .historial-filtros .btn-ver-todo { background: #eee; color: #333; }
 
+  /* 📊 Dashboard de ventas */
+  #dashboardModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #dashboardContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 900px; max-height: 88vh; overflow-y: auto; animation: fadeIn 0.3s ease; box-sizing: border-box; }
+  .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+  .dash-kpi { background: #f5f7fa; border-radius: 10px; padding: 12px; text-align: center; }
+  .dash-kpi-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+  .dash-kpi-value { font-size: 17px; font-weight: bold; color: #222; }
+  .dash-kpi-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .dash-comparativo { background: #f5f5f5; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
+  .dash-section-title { font-size: 14px; font-weight: bold; color: #333; margin: 18px 0 8px; }
+  .dash-chart-box { position: relative; height: 240px; margin-bottom: 10px; }
+  .dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .dash-grid-2 { grid-template-columns: 1fr; } }
+  .dash-top-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dash-top-table th { background: #007bff; color: white; padding: 6px 8px; text-align: left; }
+  .dash-top-table td { border: 1px solid #ddd; padding: 5px 8px; }
+  .dash-top-table tr:nth-child(even) { background: #f9f9f9; }
+  .dash-top-table td:nth-child(2), .dash-top-table td:nth-child(3),
+  .dash-top-table th:nth-child(2), .dash-top-table th:nth-child(3) { text-align: right; }
+
 
   /* =========================
    MODAL FALTANTES
@@ -1291,6 +1311,10 @@ body.admin-logged-in .admin-only {
     <button class="icon-btn" data-tooltip="Ver historial de ventas" onclick="verHistorial()" aria-label="Ver historial de ventas">📋</button>
     <span class="tool-bar-label">Historial</span>
   </div>
+  <div class="tool-bar-item admin-only">
+    <button class="icon-btn" data-tooltip="Dashboard de ventas" onclick="verDashboard()" aria-label="Dashboard de ventas">📊</button>
+    <span class="tool-bar-label">Dashboard</span>
+  </div>
   <div class="tool-bar-item">
     <button class="icon-btn" data-tooltip="Pedidos guardados" onclick="abrirPedidosGuardados()" aria-label="Pedidos guardados">📁</button>
     <span class="tool-bar-label">Pedidos</span>
@@ -1539,6 +1563,40 @@ body.admin-logged-in .admin-only {
   </div>
 </div>
 
+<!-- 📊 Dashboard de ventas -->
+<div id="dashboardModal">
+  <div id="dashboardContent">
+    <button class="close-historial" onclick="document.getElementById('dashboardModal').style.display='none'">✖ Cerrar</button>
+    <h3>📊 Dashboard de ventas</h3>
+    <div class="historial-filtros">
+      <label>Desde <input type="date" id="dashboardDesde"></label>
+      <label>Hasta <input type="date" id="dashboardHasta"></label>
+      <button onclick="aplicarFiltroDashboard()">Filtrar</button>
+      <button class="btn-ver-todo" onclick="limpiarFiltroDashboard()">Ver todo</button>
+    </div>
+
+    <div id="dashboardKpis" class="dash-kpis"></div>
+    <div id="dashboardComparativo"></div>
+
+    <div class="dash-section-title">📈 Ventas por día</div>
+    <div class="dash-chart-box"><canvas id="chartVentasDia"></canvas></div>
+
+    <div class="dash-grid-2">
+      <div>
+        <div class="dash-section-title">🏷️ Público vs Taller</div>
+        <div class="dash-chart-box"><canvas id="chartPublicoTaller"></canvas></div>
+      </div>
+      <div>
+        <div class="dash-section-title">💵 Evolución del margen %</div>
+        <div class="dash-chart-box"><canvas id="chartMargenDia"></canvas></div>
+      </div>
+    </div>
+
+    <div class="dash-section-title">🏆 Top productos más vendidos</div>
+    <div id="dashboardTopProductos"></div>
+  </div>
+</div>
+
 <!-- Modal faltantes -->
 <div id="pedidoModal" class="modal">
 
@@ -1618,6 +1676,7 @@ body.admin-logged-in .admin-only {
 
 <!-- Librería para generar el QR de WhatsApp en el recibo/cotización -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
@@ -4662,20 +4721,27 @@ function parseFechaSheet(val) {
 
   // 📋 Ver historial (carga los datos UNA vez y los deja en caché;
   // el filtrado por fecha se hace después en el navegador, sin re-consultar el Sheet)
-  async function verHistorial() {
+  // 📋 Trae las filas de la hoja "Ventas" y las deja en caché
+  // (historialRowsCache). La usan tanto "Ver historial" como el
+  // "Dashboard de ventas", para no duplicar el fetch en dos funciones.
+  async function cargarHistorialRowsCache() {
     const VENTAS_NAME = "Ventas";
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(VENTAS_NAME)}&tqx=out:json&_=${Date.now()}`;
 
-    try {
-      const res = await fetch(url);
-      const text = await res.text();
-      const json = JSON.parse(
-        text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
-      );
+    const res = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(
+      text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
+    );
 
-      historialRowsCache = json.table.rows.map(r =>
-        r.c.map(c => c ? (c.f || c.v) : "")
-      );
+    historialRowsCache = json.table.rows.map(r =>
+      r.c.map(c => c ? (c.f || c.v) : "")
+    );
+  }
+
+  async function verHistorial() {
+    try {
+      await cargarHistorialRowsCache();
 
       // Por defecto: últimos 15 días (incluyendo hoy)
       const hoy = new Date();
@@ -4711,12 +4777,6 @@ function parseFechaSheet(val) {
     tbody.innerHTML = "";
 
     const resumenDias = {};
-    // 💰 Margen total del periodo mostrado (columna I = Margen, ya viene en
-    // negativo para las devoluciones, así que sumar todo da el neto real).
-    let margenTotal = 0;
-    // 🏷️ Ventas agrupadas por tipo (Publico/Taller), sobre el subtotal real
-    // (columna E), también neto de devoluciones porque esas ya son negativas.
-    const ventasPorTipo = { Publico: 0, Taller: 0, "—": 0 };
 
     if (rows.length === 0) {
       tbody.innerHTML = `
@@ -4743,11 +4803,6 @@ function parseFechaSheet(val) {
 
         resumenDias[fechaDia] += subtotal;
 
-        margenTotal += Number(r[8]) || 0;
-
-        const tipoVenta = r[12] === "Publico" || r[12] === "Taller" ? r[12] : "—";
-        ventasPorTipo[tipoVenta] += subtotal;
-
         tbody.innerHTML += `
           <tr>
             <td>${fechaVisible}</td>
@@ -4759,30 +4814,10 @@ function parseFechaSheet(val) {
         });
     }
 
-    // Mostrar resumen por día + total general del rango mostrado/filtrado
-    const totalGeneral = Object.values(resumenDias).reduce((s, v) => s + v, 0);
-    const margenPorcentajeTotal = totalGeneral > 0 ? (margenTotal / totalGeneral * 100) : 0;
-
-    let resumenHTML = `<div style="font-size:15px; margin-bottom:8px;">🧮 Total del periodo mostrado: ${formatCurrency(totalGeneral)}</div>`;
-    resumenHTML += `<div style="font-size:14px; margin-bottom:4px;">💵 Margen total: ${formatCurrency(margenTotal)} (${margenPorcentajeTotal.toFixed(1)}%)</div>`;
-    resumenHTML += `<div style="font-size:14px; margin-bottom:12px;">🏷️ Público: ${formatCurrency(ventasPorTipo.Publico)} · Taller: ${formatCurrency(ventasPorTipo.Taller)}${ventasPorTipo["—"] !== 0 ? ` · Sin clasificar: ${formatCurrency(ventasPorTipo["—"])}` : ""}</div>`;
-
-    // 📊 NUEVO: comparativo contra el mismo periodo, un mes antes.
-    const periodoAnterior = calcularPeriodoAnterior(desde, hasta);
-    if (periodoAnterior) {
-      const resumenAnterior = calcularResumenRango(periodoAnterior.desde, periodoAnterior.hasta);
-      resumenHTML += `<div style="background:#f5f5f5; border-radius:8px; padding:10px 12px; margin-bottom:12px;">`;
-      resumenHTML += `<div style="font-size:12px; color:#666; margin-bottom:6px;">📊 Comparado con el periodo anterior (${periodoAnterior.desde} a ${periodoAnterior.hasta}):</div>`;
-      resumenHTML += `<div style="font-size:13px; margin-bottom:2px;">🧮 Total: ${formatCurrency(resumenAnterior.total)} → ${formatCambioPorcentual(totalGeneral, resumenAnterior.total)}</div>`;
-      resumenHTML += `<div style="font-size:13px; margin-bottom:2px;">💵 Margen: ${formatCurrency(resumenAnterior.margen)} → ${formatCambioPorcentual(margenTotal, resumenAnterior.margen)}</div>`;
-      resumenHTML += `<div style="font-size:13px; margin-bottom:2px;">🏷️ Público: ${formatCurrency(resumenAnterior.publico)} → ${formatCambioPorcentual(ventasPorTipo.Publico, resumenAnterior.publico)}</div>`;
-      resumenHTML += `<div style="font-size:13px;">🔧 Taller: ${formatCurrency(resumenAnterior.taller)} → ${formatCambioPorcentual(ventasPorTipo.Taller, resumenAnterior.taller)}</div>`;
-      resumenHTML += `</div>`;
-    } else {
-      resumenHTML += `<div style="font-size:12px; color:#999; margin-bottom:12px;">📊 Selecciona un rango de fechas "Desde" y "Hasta" para ver el comparativo con el periodo anterior.</div>`;
-    }
-
-    resumenHTML += "💰 Totales por día:<br><br>";
+    // 💰 NOTA: los totales generales, el margen y el comparativo con el
+    // periodo anterior se movieron al "📊 Dashboard de ventas" (botón
+    // aparte). Aquí solo queda el detalle día a día del rango filtrado.
+    let resumenHTML = "💰 Totales por día:<br><br>";
 
     Object.keys(resumenDias)
       .sort()
@@ -4805,6 +4840,204 @@ function parseFechaSheet(val) {
     document.getElementById("historialHasta").value = "";
     renderHistorial();
   }
+
+  // ============================================================
+  // 📊 Dashboard de ventas
+  // ============================================================
+
+  // Recorre historialRowsCache filtrado por fecha y devuelve todos los
+  // agregados que necesita el dashboard: total por día, margen por día,
+  // ventas por tipo (Publico/Taller) y ventas agrupadas por producto
+  // (para el ranking de más vendidos).
+  function calcularAgregadosPeriodo(desdeStr, hastaStr) {
+    const resumenDias = {};      // fecha -> subtotal
+    const margenPorDia = {};     // fecha -> margen
+    let margenTotal = 0;
+    const ventasPorTipo = { Publico: 0, Taller: 0, "—": 0 };
+    const porProducto = new Map(); // nombre -> { cantidad, subtotal }
+
+    (historialRowsCache || []).forEach(r => {
+      const fechaDia = (r[0] || "").toString().split(" ")[0];
+      if (desdeStr && fechaDia < desdeStr) return;
+      if (hastaStr && fechaDia > hastaStr) return;
+
+      const nombre = r[1] || "—";
+      const cantidad = Number(r[2]) || 0;
+      const subtotal = Number(r[4]) || 0;
+      const margen = Number(r[8]) || 0;
+      const tipoVenta = r[12] === "Publico" || r[12] === "Taller" ? r[12] : "—";
+
+      resumenDias[fechaDia] = (resumenDias[fechaDia] || 0) + subtotal;
+      margenPorDia[fechaDia] = (margenPorDia[fechaDia] || 0) + margen;
+      margenTotal += margen;
+      ventasPorTipo[tipoVenta] += subtotal;
+
+      if (!porProducto.has(nombre)) porProducto.set(nombre, { cantidad: 0, subtotal: 0 });
+      const p = porProducto.get(nombre);
+      p.cantidad += cantidad;
+      p.subtotal += subtotal;
+    });
+
+    return { resumenDias, margenPorDia, margenTotal, ventasPorTipo, porProducto };
+  }
+
+  // 🗂️ Instancias activas de Chart.js, para poder destruirlas antes de
+  // volver a dibujar (si no, Chart.js las va acumulando en el mismo
+  // <canvas> y se rompe el gráfico al filtrar de nuevo).
+  const dashboardCharts = {};
+  function destruirChartSiExiste(id) {
+    if (dashboardCharts[id]) {
+      dashboardCharts[id].destroy();
+      delete dashboardCharts[id];
+    }
+  }
+
+  function renderChartBarras(canvasId, labels, data, label) {
+    destruirChartSiExiste(canvasId);
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    dashboardCharts[canvasId] = new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets: [{ label, data, backgroundColor: "#00b09b", borderRadius: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  function renderChartDonut(canvasId, labels, data) {
+    destruirChartSiExiste(canvasId);
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    dashboardCharts[canvasId] = new Chart(ctx, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data, backgroundColor: ["#007bff", "#ff9800"] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+    });
+  }
+
+  function renderChartLinea(canvasId, labels, data, label) {
+    destruirChartSiExiste(canvasId);
+    const ctx = document.getElementById(canvasId).getContext("2d");
+    dashboardCharts[canvasId] = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label, data, borderColor: "#96c93d",
+          backgroundColor: "rgba(150,201,61,0.15)", fill: true, tension: 0.3, pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => v + "%" } } }
+      }
+    });
+  }
+
+  async function verDashboard() {
+    if (typeof Chart === "undefined") {
+      alert("❌ No se pudo cargar la librería de gráficos (Chart.js). Revisa tu conexión a internet e intenta de nuevo.");
+      return;
+    }
+    try {
+      await cargarHistorialRowsCache();
+
+      // Por defecto: últimos 15 días (incluyendo hoy), igual que el historial
+      const hoy = new Date();
+      const hace15 = new Date();
+      hace15.setDate(hoy.getDate() - 14);
+
+      document.getElementById("dashboardHasta").value = formatFechaISO(hoy);
+      document.getElementById("dashboardDesde").value = formatFechaISO(hace15);
+
+      renderDashboard();
+      document.getElementById("dashboardModal").style.display = "flex";
+
+    } catch (e) {
+      alert("❌ No se pudo cargar el dashboard.");
+      console.error(e);
+    }
+  }
+
+  function renderDashboard() {
+    if (!historialRowsCache) return;
+
+    const desde = document.getElementById("dashboardDesde").value;
+    const hasta = document.getElementById("dashboardHasta").value;
+
+    const { resumenDias, margenPorDia, margenTotal, ventasPorTipo, porProducto } = calcularAgregadosPeriodo(desde, hasta);
+    const totalGeneral = Object.values(resumenDias).reduce((s, v) => s + v, 0);
+    const margenPorcentajeTotal = totalGeneral > 0 ? (margenTotal / totalGeneral * 100) : 0;
+
+    // --- KPIs ---
+    let kpiHTML = "";
+    kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">🧮 Total del periodo</div><div class="dash-kpi-value">${formatCurrency(totalGeneral)}</div></div>`;
+    kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">💵 Margen total</div><div class="dash-kpi-value">${formatCurrency(margenTotal)}</div><div class="dash-kpi-sub">${margenPorcentajeTotal.toFixed(1)}%</div></div>`;
+    kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">🏷️ Público</div><div class="dash-kpi-value">${formatCurrency(ventasPorTipo.Publico)}</div></div>`;
+    kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">🔧 Taller</div><div class="dash-kpi-value">${formatCurrency(ventasPorTipo.Taller)}</div></div>`;
+    document.getElementById("dashboardKpis").innerHTML = kpiHTML;
+
+    // --- Comparativo con el periodo anterior (mismo cálculo de siempre) ---
+    const periodoAnterior = calcularPeriodoAnterior(desde, hasta);
+    let compHTML = "";
+    if (periodoAnterior) {
+      const resumenAnterior = calcularResumenRango(periodoAnterior.desde, periodoAnterior.hasta);
+      compHTML += `<div class="dash-comparativo">`;
+      compHTML += `<div style="font-size:12px; color:#666; margin-bottom:6px;">📊 Comparado con el periodo anterior (${periodoAnterior.desde} a ${periodoAnterior.hasta}):</div>`;
+      compHTML += `<div style="font-size:13px; margin-bottom:2px;">🧮 Total: ${formatCurrency(resumenAnterior.total)} → ${formatCambioPorcentual(totalGeneral, resumenAnterior.total)}</div>`;
+      compHTML += `<div style="font-size:13px; margin-bottom:2px;">💵 Margen: ${formatCurrency(resumenAnterior.margen)} → ${formatCambioPorcentual(margenTotal, resumenAnterior.margen)}</div>`;
+      compHTML += `<div style="font-size:13px; margin-bottom:2px;">🏷️ Público: ${formatCurrency(resumenAnterior.publico)} → ${formatCambioPorcentual(ventasPorTipo.Publico, resumenAnterior.publico)}</div>`;
+      compHTML += `<div style="font-size:13px;">🔧 Taller: ${formatCurrency(resumenAnterior.taller)} → ${formatCambioPorcentual(ventasPorTipo.Taller, resumenAnterior.taller)}</div>`;
+      compHTML += `</div>`;
+    } else {
+      compHTML = `<div style="font-size:12px; color:#999; margin-bottom:12px;">📊 Selecciona un rango de fechas "Desde" y "Hasta" para ver el comparativo con el periodo anterior.</div>`;
+    }
+    document.getElementById("dashboardComparativo").innerHTML = compHTML;
+
+    // --- Gráficos ---
+    const fechasOrdenadas = Object.keys(resumenDias).sort();
+
+    if (fechasOrdenadas.length === 0) {
+      // Sin datos en el rango: se limpian los gráficos existentes en vez de
+      // dejar el último gráfico dibujado con datos de otro periodo.
+      ["chartVentasDia", "chartPublicoTaller", "chartMargenDia"].forEach(destruirChartSiExiste);
+    } else {
+      renderChartBarras("chartVentasDia", fechasOrdenadas, fechasOrdenadas.map(f => resumenDias[f]), "Ventas ($)");
+      renderChartDonut("chartPublicoTaller", ["Público", "Taller"], [ventasPorTipo.Publico, ventasPorTipo.Taller]);
+      const margenPctPorDia = fechasOrdenadas.map(f => resumenDias[f] > 0 ? (margenPorDia[f] / resumenDias[f] * 100) : 0);
+      renderChartLinea("chartMargenDia", fechasOrdenadas, margenPctPorDia, "Margen %");
+    }
+
+    // --- Top productos más vendidos (por $ vendido, top 10) ---
+    const topProductos = [...porProducto.entries()]
+      .map(([nombre, v]) => ({ nombre, ...v }))
+      .sort((a, b) => b.subtotal - a.subtotal)
+      .slice(0, 10);
+
+    let topHTML = `<table class="dash-top-table"><thead><tr><th>Producto</th><th>Unidades</th><th>Total $</th></tr></thead><tbody>`;
+    if (topProductos.length === 0) {
+      topHTML += `<tr><td colspan="3" style="text-align:center;color:#999;">Sin ventas registradas en este rango de fechas.</td></tr>`;
+    } else {
+      topProductos.forEach(p => {
+        topHTML += `<tr><td>${p.nombre}</td><td>${p.cantidad}</td><td>${formatCurrency(p.subtotal)}</td></tr>`;
+      });
+    }
+    topHTML += `</tbody></table>`;
+    document.getElementById("dashboardTopProductos").innerHTML = topHTML;
+  }
+
+  function aplicarFiltroDashboard() {
+    renderDashboard();
+  }
+
+  function limpiarFiltroDashboard() {
+    document.getElementById("dashboardDesde").value = "";
+    document.getElementById("dashboardHasta").value = "";
+    renderDashboard();
+  }
+
 // Toast
   function showToast(msg) {
     const t = document.getElementById("toast");

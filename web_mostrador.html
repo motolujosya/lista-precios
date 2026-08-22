@@ -621,6 +621,8 @@
   .inv-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
   .inv-toolbar .inv-filtro-marcas { margin-bottom: 0; }
   .inv-btn-exportar { border: none; background: linear-gradient(90deg, #28a745, #71dd8a); color: #fff; font-weight: bold; font-size: 12px; padding: 7px 14px; border-radius: 20px; cursor: pointer; white-space: nowrap; }
+  .inv-filtrar-exportar-check { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #444; cursor: pointer; white-space: nowrap; user-select: none; }
+  .inv-filtrar-exportar-check input { width: 15px; height: 15px; cursor: pointer; margin: 0; }
   .inv-bajo-row { position: relative; padding-left: 40px; }
   .inv-checkbox-pedido { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; }
   .inv-checkbox-pedido input { width: 18px; height: 18px; cursor: pointer; }
@@ -1315,6 +1317,10 @@ body.admin-logged-in .admin-only {
     <button class="icon-btn" data-tooltip="Dashboard de ventas" onclick="verDashboard()" aria-label="Dashboard de ventas">📊</button>
     <span class="tool-bar-label">Dashboard</span>
   </div>
+  <div class="tool-bar-item admin-only">
+    <button class="icon-btn" data-tooltip="Alerta de inventario" onclick="abrirAlertaInventarioManual()" aria-label="Alerta de inventario">📦</button>
+    <span class="tool-bar-label">Inventario</span>
+  </div>
   <div class="tool-bar-item">
     <button class="icon-btn" data-tooltip="Pedidos guardados" onclick="abrirPedidosGuardados()" aria-label="Pedidos guardados">📁</button>
     <span class="tool-bar-label">Pedidos</span>
@@ -1677,6 +1683,7 @@ body.admin-logged-in .admin-only {
 <!-- Librería para generar el QR de WhatsApp en el recibo/cotización -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
@@ -2258,8 +2265,19 @@ body.admin-logged-in .admin-only {
   // esté abierta; es un recordatorio visual para esta sesión, no se guarda
   // en ningún lado permanente).
   let inventarioBajoYaPedido = new Set();
+  // 📥 Estado del checkbox "Filtrar" junto al botón de exportar. Cuando
+  // está activo, la exportación respeta la(s) marca(s) seleccionada(s)
+  // arriba (o incluye todas si no hay ninguna elegida) y EXCLUYE los
+  // productos ya marcados como "ya pedido". Cuando está desactivado,
+  // exporta absolutamente todo, sin importar el filtro de marca ni si
+  // algo ya fue marcado.
+  let inventarioFiltrarExportarActivo = false;
 
-  function revisarInventarioBajo() {
+  function toggleFiltrarExportarInventario(activo) {
+    inventarioFiltrarExportarActivo = activo;
+  }
+
+  function calcularInventarioBajo() {
     const sinStock = [];
     const stockBajo = [];
 
@@ -2275,6 +2293,11 @@ body.admin-logged-in .admin-only {
       }
     });
 
+    inventarioBajoSinStock = sinStock;
+    inventarioBajoStockBajo = stockBajo;
+  }
+
+  function revisarInventarioBajo() {
     // 🐛 FIX: antes esto se calculaba UNA sola vez por sesión y quedaba
     // congelado para siempre (aunque se reabasteciera un producto o
     // cambiara el stock después, la ventana seguía mostrando los números
@@ -2283,8 +2306,7 @@ body.admin-logged-in .admin-only {
     // por sesión" es que la ventana se ABRA SOLA, para no interrumpirte
     // cada vez que el catálogo se refresca en segundo plano (por ejemplo,
     // tras cada venta).
-    inventarioBajoSinStock = sinStock;
-    inventarioBajoStockBajo = stockBajo;
+    calcularInventarioBajo();
 
     const modal = document.getElementById("inventarioBajoModal");
     const yaEstaAbierta = modal.style.display === "flex";
@@ -2296,7 +2318,7 @@ body.admin-logged-in .admin-only {
       return;
     }
 
-    if (sinStock.length === 0 && stockBajo.length === 0) return; // todo en orden, no se muestra nada
+    if (inventarioBajoSinStock.length === 0 && inventarioBajoStockBajo.length === 0) return; // todo en orden, no se muestra nada
 
     if (!alertaInventarioMostrada) {
       alertaInventarioMostrada = true;
@@ -2304,6 +2326,20 @@ body.admin-logged-in .admin-only {
       renderInventarioBajo();
       modal.style.display = "flex";
     }
+  }
+
+  // 📦 NUEVO: abre la misma ventana de "Alerta de inventario" a demanda,
+  // desde el botón de la barra de herramientas. A diferencia de la alerta
+  // automática de arriba (que solo aparece una vez por sesión y solo si
+  // hay algo pendiente), este botón SIEMPRE abre la ventana cuando el
+  // admin lo pide — incluso si el inventario está completo, para que
+  // pueda confirmarlo — y siempre recalcula con el stock más reciente.
+  function abrirAlertaInventarioManual() {
+    if (!isAdmin() || !productosData.length) return;
+    calcularInventarioBajo();
+    inventarioBajoMarcasSeleccionadas = new Set();
+    renderInventarioBajo();
+    document.getElementById("inventarioBajoModal").style.display = "flex";
   }
 
   function toggleFiltroMarcaInventario(marca) {
@@ -2326,10 +2362,29 @@ body.admin-logged-in .admin-only {
 
   // 📥 Exporta a CSV (se abre directo en Excel) la lista actualmente visible
   // en la ventana — respeta el filtro de marca activo en ese momento.
+  // 📥 Exporta a un archivo .xlsx REAL (celdas de Excel separadas de
+  // verdad, no texto unido por comas) la lista actualmente visible en la
+  // ventana — respeta el filtro de marca activo en ese momento.
+  // Antes esto generaba un CSV: en algunos equipos, según la configuración
+  // regional de Excel (coma como separador decimal, etc.), las columnas
+  // podían llegar a verse todas juntas en una sola celda. Con un .xlsx
+  // real cada dato queda siempre en su propia celda, sin depender de la
+  // configuración de Excel.
   function exportarInventarioBajoCSV() {
     const todos = [...inventarioBajoSinStock, ...inventarioBajoStockBajo];
-    const hayFiltroActivo = inventarioBajoMarcasSeleccionadas.size > 0;
-    const pasaFiltro = p => !hayFiltroActivo || inventarioBajoMarcasSeleccionadas.has(p.marca);
+    const hayFiltroMarcaActivo = inventarioBajoMarcasSeleccionadas.size > 0;
+
+    // 🔘 Checkbox "Filtrar": si está marcado, se incluye solo la(s)
+    // marca(s) elegida(s) arriba (o todas si no hay ninguna elegida) y se
+    // excluyen los productos ya marcados como "ya pedido". Si está sin
+    // marcar, se exporta todo tal cual, ignorando ambos filtros.
+    const pasaFiltro = p => {
+      if (!inventarioFiltrarExportarActivo) return true;
+      const pasaMarca = !hayFiltroMarcaActivo || inventarioBajoMarcasSeleccionadas.has(p.marca);
+      const noEstaYaPedido = !inventarioBajoYaPedido.has(p.code);
+      return pasaMarca && noEstaYaPedido;
+    };
+
     const filtrados = todos.filter(pasaFiltro);
 
     if (filtrados.length === 0) {
@@ -2337,7 +2392,11 @@ body.admin-logged-in .admin-only {
       return;
     }
 
-    const escaparCSV = v => `"${(v ?? "").toString().replace(/"/g, '""')}"`;
+    if (typeof XLSX === "undefined") {
+      alert("❌ No se pudo cargar la librería para generar el Excel. Revisa tu conexión a internet e intenta de nuevo.");
+      return;
+    }
+
     const encabezados = ["Estado", "Codigo", "Producto", "Marca", "Info", "Stock", "Umbral", "Ya pedido"];
     const filas = filtrados.map(p => [
       p.stock === 0 ? "Sin stock" : "Stock bajo",
@@ -2350,19 +2409,18 @@ body.admin-logged-in .admin-only {
       inventarioBajoYaPedido.has(p.code) ? "Si" : "No"
     ]);
 
-    const contenidoCSV = "\uFEFF" + [encabezados, ...filas]
-      .map(fila => fila.map(escaparCSV).join(","))
-      .join("\r\n");
+    const hoja = XLSX.utils.aoa_to_sheet([encabezados, ...filas]);
+    // 📏 Ancho de columna aproximado según el contenido más largo de cada
+    // una, para que no queden ni muy angostas ni muy anchas al abrir el
+    // archivo.
+    hoja["!cols"] = encabezados.map((enc, i) => {
+      const maxLargo = Math.max(enc.length, ...filas.map(f => (f[i] ?? "").toString().length));
+      return { wch: Math.min(Math.max(maxLargo + 2, 10), 45) };
+    });
 
-    const blob = new Blob([contenidoCSV], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `inventario_bajo_${formatFechaISO(new Date())}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Inventario");
+    XLSX.writeFile(libro, `inventario_bajo_${formatFechaISO(new Date())}.xlsx`);
   }
 
   function renderInventarioBajo() {
@@ -2407,6 +2465,10 @@ body.admin-logged-in .admin-only {
       `).join("") + `</div>`;
     }
     html += `<button class="inv-btn-exportar" onclick="exportarInventarioBajoCSV()">📥 Exportar a Excel</button>`;
+    html += `<label class="inv-filtrar-exportar-check" data-tooltip="Si está marcado: exporta solo la(s) marca(s) seleccionada(s) arriba (o todas si no elegiste ninguna) y excluye los productos ya marcados como 'ya pedido'. Si está sin marcar: exporta absolutamente todo.">
+      <input type="checkbox" id="inventarioFiltrarExportarCheck" ${inventarioFiltrarExportarActivo ? "checked" : ""} onchange="toggleFiltrarExportarInventario(this.checked)">
+      Filtrar
+    </label>`;
     html += `</div>`;
 
     if (sinStock.length > 0) {

@@ -1919,10 +1919,10 @@ body.admin-logged-in .admin-only {
       const umbral = (umbralRaw !== undefined && umbralRaw !== "" && !isNaN(parseInt(umbralRaw)))
         ? parseInt(umbralRaw)
         : null;
-      const rel1 = obj["relacionado1"] || "";
-      const rel2 = obj["relacionado2"] || "";
-      const rel3 = obj["relacionado3"] || "";
-      const rel4 = obj["relacionado4"] || "";
+      const rel1 = obj["relacionado1"] || obj["relacionado 1"] || "";
+      const rel2 = obj["relacionado2"] || obj["relacionado 2"] || "";
+      const rel3 = obj["relacionado3"] || obj["relacionado 3"] || "";
+      const rel4 = obj["relacionado4"] || obj["relacionado 4"] || "";
       const relacionados = [rel1, rel2, rel3, rel4].filter(Boolean);
       // 📝 Nota interna por producto (columna "Notas" en la hoja "Lista").
       // Solo la ve el administrador logueado, nunca el cliente ni el personal
@@ -2776,22 +2776,49 @@ function sincronizarCarritoConCatalogo() {
 // Se usa tanto para el panel de sugerencias del carrito como para las
 // sugerencias que se muestran dentro del chat.
 function buscarProductosRelacionados(producto) {
-  if (!producto || !producto.relacionados || producto.relacionados.length === 0) return [];
+  if (!producto) {
+    // 🩺 No debería pasar nunca en un flujo normal (siempre se llama con
+    // el producto recién agregado al carrito), pero si code no coincide
+    // EXACTO con el código guardado en productosData, "producto" llega
+    // undefined aquí y antes esto se cortaba en silencio sin avisar nada.
+    console.warn(`⚠️ buscarProductosRelacionados: no se encontró el producto recién agregado en productosData (posible desajuste de código).`);
+    return [];
+  }
+  if (!producto.relacionados || producto.relacionados.length === 0) {
+    // 🩺 Este es el caso más común de "no me muestra nada en la consola":
+    // el producto que agregaste al carrito no tiene NADA cargado en sus
+    // columnas relacionado1-4 (están vacías, o el texto quedó en una
+    // columna distinta a esas 4). Este aviso confirma que el sistema ni
+    // siquiera detectó relacionados configurados para revisar.
+    console.info(`ℹ️ "${producto.name}" (código ${producto.code}) no tiene ningún relacionado1-4 configurado en la hoja "Lista".`);
+    return [];
+  }
 
   const codigosYaAgregados = new Set();
   return producto.relacionados
     .map(r => {
-      const clave = r.toString().trim();
+      const clave = r.toString().trim().toLowerCase();
       const porCodigo = productosData.find(
-        p => p.code && p.code.toString().trim().toLowerCase() === clave.toLowerCase()
+        p => p.code && p.code.toString().trim().toLowerCase() === clave
       );
-      const encontrado = porCodigo || productosData.find(p => p.name === clave);
+      // 🐛 FIX: antes esta comparación por nombre era EXACTA (mayúsculas y
+      // espacios debían coincidir letra por letra), a diferencia de la
+      // comparación por código de arriba, que sí es tolerante. Un
+      // relacionado escrito por nombre con una sola mayúscula distinta o
+      // un espacio de más/menos que el "producto" real del catálogo no
+      // se encontraba, y la sugerencia se perdía sin que se notara en la
+      // ventana de venta (solo un aviso en la consola del navegador).
+      // Ahora se compara igual de flexible en ambos casos.
+      const porNombre = productosData.find(
+        p => p.name && p.name.toString().trim().toLowerCase() === clave
+      );
+      const encontrado = porCodigo || porNombre;
       if (!encontrado) {
         // 🩺 Ayuda a detectar errores de tipeo en la hoja: si "clave" no
         // coincide con ningún código ni nombre del catálogo, la
         // sugerencia se pierde en silencio. Este aviso solo lo ve quien
         // abra la consola del navegador (no molesta al cliente).
-        console.warn(`⚠️ "relacionado" no encontrado para "${producto.name}" (código ${producto.code}): "${clave}" no coincide con ningún código ni nombre del catálogo.`);
+        console.warn(`⚠️ "relacionado" no encontrado para "${producto.name}" (código ${producto.code}): "${r}" no coincide con ningún código ni nombre del catálogo.`);
       }
       return encontrado;
     })
@@ -2799,8 +2826,19 @@ function buscarProductosRelacionados(producto) {
     // columnas (por ejemplo relacionado1 y relacionado3) terminan
     // apuntando al mismo código.
     .filter(p => {
-      if (!p || p.stock <= 0 || cart.find(c => c.code === p.code)) return false;
-      if (codigosYaAgregados.has(p.code)) return false;
+      if (!p) return false; // ya se avisó arriba por qué no se encontró
+      if (p.stock <= 0) {
+        // 🩺 Esto es lo más probable si "el código existe pero no me lo
+        // muestra": por diseño, un relacionado SIN STOCK nunca se sugiere
+        // (no tendría sentido ofrecer algo que no se puede vender).
+        console.warn(`⚠️ Relacionado de "${producto.name}" encontrado (${p.code} - ${p.name}) pero NO se sugiere: está sin stock.`);
+        return false;
+      }
+      if (cart.find(c => c.code === p.code)) {
+        console.warn(`⚠️ Relacionado de "${producto.name}" encontrado (${p.code} - ${p.name}) pero NO se sugiere: ya está en el carrito.`);
+        return false;
+      }
+      if (codigosYaAgregados.has(p.code)) return false; // duplicado entre relacionado1-4, no es un error
       codigosYaAgregados.add(p.code);
       return true;
     });

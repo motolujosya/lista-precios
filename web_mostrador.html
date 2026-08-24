@@ -1684,6 +1684,7 @@ body.admin-logged-in .admin-only {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 <script>
   const SHEET_ID = "1lw4waPb95DkeNLRFnYamAdB3drEe3qkFyoxzmEKIrGQ";
   const SHEET_NAME = "Lista";
@@ -1831,7 +1832,7 @@ body.admin-logged-in .admin-only {
   // cargar un pedido guardado, para no arrastrar un precio desactualizado)
   // se anota aquí con recargarCatalogo() y se le avisa cuando termine.
   let resolutoresEsperandoCatalogo = [];
-  window.google.visualization.Query.setResponse = function(response) {
+  window.google.visualization.Query.setResponse = async function(response) {
     if (!response || !response.table) return alert("Error cargando datos");
     const cols = response.table.cols.map(c => (c.label || c.id || "").trim().replace(/\s+/g, " ").toLowerCase());
     const rows = response.table.rows.map(r => r.c.map(c => c ? c.v : ""));
@@ -1845,8 +1846,26 @@ body.admin-logged-in .admin-only {
     renderProducts(cols, rows);
     filterProducts(); // vuelve a aplicar el texto de búsqueda actual sobre las tarjetas recién creadas
     sincronizarCarritoConCatalogo(); // ver definición más abajo (punto 3: mantener el carrito al día con el catálogo)
-    revisarInventarioBajoUnaVez(); // 📦 alerta de stock bajo/agotado, solo la primera vez que carga el catálogo y solo si ya eres admin
+    // 📦 NUEVO: se quitó la apertura AUTOMÁTICA de la alerta de inventario al
+    // cargar el catálogo / iniciar sesión. Ahora la alerta solo se abre a
+    // demanda, con el botón "📦 Inventario" de la barra de herramientas
+    // (abrirAlertaInventarioManual). La función revisarInventarioBajoUnaVez()
+    // se deja definida pero sin usar, por si se quiere reactivar más adelante.
     revisarCodigosDuplicadosUnaVez(); // 🔍 idem, para códigos de producto duplicados
+
+    // 🩹 NUEVO: Google entrega esta hoja como JSON con un tipo de dato fijo
+    // POR COLUMNA (número o texto), inferido según la mayoría de sus
+    // valores. Si en "relacionado1-4" la mayoría de las filas tienen
+    // códigos numéricos, Google trata TODA la columna como número —y
+    // cualquier código alfanumérico (como "JL131803") en esa columna
+    // llega vacío, sin ningún aviso, porque la celda ni siquiera se puede
+    // representar en ese tipo. No hay forma de evitarlo pidiendo los
+    // datos de esta forma. La solución: pedir la MISMA hoja una segunda
+    // vez, pero como CSV (texto plano tal cual se ve en la celda, sin
+    // inferencia de tipos), y usar SOLO esa copia para las columnas de
+    // relacionados — el resto del catálogo (precios, stock, etc.) sigue
+    // viniendo de la vía original de siempre, sin tocarla.
+    await parchearRelacionadosDesdeCSV();
 
     window.scrollTo({ top: scrollPrevio, behavior: "instant" });
 
@@ -1854,6 +1873,55 @@ body.admin-logged-in .admin-only {
     resolutoresEsperandoCatalogo = [];
     resolutores.forEach(resolve => resolve());
   };
+
+  // 🩹 Ver comentario arriba: reemplaza producto.relacionados de CADA
+  // producto usando una copia de la hoja "Lista" traída como CSV (texto
+  // plano), que no sufre la pérdida de valores alfanuméricos que sí tiene
+  // la vía JSON para columnas mayormente numéricas. Si esta consulta
+  // falla por cualquier motivo (sin internet, etc.), simplemente se deja
+  // lo que ya se había cargado por la vía normal, sin romper nada.
+  async function parchearRelacionadosDesdeCSV() {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:csv&_=${Date.now()}`;
+      const res = await fetch(url);
+      const csvText = await res.text();
+      const resultado = Papa.parse(csvText, { skipEmptyLines: true });
+      const filas = resultado.data;
+      if (!filas || filas.length < 2) return;
+
+      const normalizarEncabezado = h => (h || "").toString().trim().replace(/\s+/g, " ").toLowerCase();
+      const encabezados = filas[0].map(normalizarEncabezado);
+      const iCodigo = encabezados.indexOf("codigo");
+      if (iCodigo === -1) return; // sin columna código no se puede cruzar con productosData, se deja como estaba
+
+      const indiceRel = n =>
+        encabezados.indexOf(`relacionado${n}`) !== -1
+          ? encabezados.indexOf(`relacionado${n}`)
+          : encabezados.indexOf(`relacionado ${n}`); // por si el encabezado quedó con espacio
+      const iRel = [1, 2, 3, 4].map(indiceRel);
+
+      // código (normalizado) -> array de relacionados, en texto plano tal
+      // cual aparece en la celda, sin ninguna inferencia de tipo de por medio.
+      const mapaRelacionadosPorCodigo = new Map();
+      for (let i = 1; i < filas.length; i++) {
+        const fila = filas[i];
+        const codigo = (fila[iCodigo] || "").toString().trim();
+        if (!codigo) continue;
+        const relacionados = iRel
+          .map(idx => (idx === -1 ? "" : (fila[idx] || "").toString().trim()))
+          .filter(Boolean);
+        mapaRelacionadosPorCodigo.set(codigo.toLowerCase(), relacionados);
+      }
+
+      productosData.forEach(p => {
+        if (!p.code) return;
+        const relacionados = mapaRelacionadosPorCodigo.get(p.code.toString().trim().toLowerCase());
+        if (relacionados) p.relacionados = relacionados;
+      });
+    } catch (e) {
+      console.error("⚠️ No se pudieron reforzar los \"relacionados\" vía CSV (se sigue usando lo que trajo la carga normal del catálogo):", e);
+    }
+  }
 
   // 🔄 NUEVO: dispara una recarga del catálogo (nombre, precio, stock, etc.
   // — todo lo que trae la hoja "Lista") y devuelve una Promise que se
@@ -3214,20 +3282,44 @@ function mostrarSugerencias(code) {
     const motivo = document.getElementById("devolucionMotivo").value.trim();
 
     try {
-      const res = await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "registrarDevolucion",
-          apiKey: WEBAPP_API_KEY,
-          numeroReciboOriginal: numeroOriginal,
-          motivo,
-          entorno: ENTORNO,
-          items: itemsADevolver
-        })
-      });
+      // 🔁 Mismo arreglo aplicado a la venta: Apps Script a veces falla de
+      // forma transitoria y devuelve una página HTML de error de Google en
+      // vez del JSON esperado. Se reintenta una vez y se lee el texto crudo
+      // primero, en vez de response.json() directo, para no explotar con
+      // "Unexpected token '<' ... is not valid JSON" y en vez de eso poder
+      // mostrar la causa real si el segundo intento también falla.
+      const MAX_INTENTOS_DEVOLUCION = 2;
+      let res, textoRespuesta, result;
+      for (let intento = 1; intento <= MAX_INTENTOS_DEVOLUCION; intento++) {
+        res = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "registrarDevolucion",
+            apiKey: WEBAPP_API_KEY,
+            numeroReciboOriginal: numeroOriginal,
+            motivo,
+            entorno: ENTORNO,
+            items: itemsADevolver
+          })
+        });
 
-      const result = await res.json();
+        textoRespuesta = await res.text();
+        try {
+          result = JSON.parse(textoRespuesta);
+          break; // ✅ respuesta válida, no hace falta reintentar
+        } catch (parseErr) {
+          console.error(`❌ Intento ${intento}/${MAX_INTENTOS_DEVOLUCION}: el servidor no respondió JSON. Respuesta cruda:`, textoRespuesta);
+          if (intento === MAX_INTENTOS_DEVOLUCION) {
+            throw new Error(
+              `El servidor no respondió correctamente tras ${MAX_INTENTOS_DEVOLUCION} intentos (status ${res.status}). ` +
+              `Puede que el deployment de Apps Script esté caído, sin permisos, o con la cuota diaria excedida. ` +
+              `Respuesta recibida: ${textoRespuesta.slice(0, 200)}`
+            );
+          }
+          await new Promise(r => setTimeout(r, 1500)); // pequeña espera antes de reintentar
+        }
+      }
 
       if (!res.ok || !result.ok) {
         const detalle = (result.errores && result.errores.length)
@@ -3287,6 +3379,12 @@ function mostrarSugerencias(code) {
   // 💾 Pedidos guardados (cotizaciones) — se guardan en este navegador
   const QUOTES_KEY = "pedidosGuardados";
 
+  // ✏️ NUEVO: recuerda qué pedido guardado está actualmente cargado en el
+  // carrito (se setea en cargarPedidoGuardado y se limpia al vaciar el
+  // carrito o al finalizar una venta), para poder ofrecer "sobrescribir"
+  // en vez de crear un pedido nuevo cuando se le agregan/quitan productos.
+  let pedidoGuardadoActualId = null;
+
   function getSavedQuotes() {
     try {
       return JSON.parse(localStorage.getItem(QUOTES_KEY)) || [];
@@ -3301,13 +3399,37 @@ function mostrarSugerencias(code) {
 
   document.getElementById("saveQuoteBtn").onclick = () => {
     if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
-    const nombre = prompt("Nombre o referencia para este pedido (ej: cliente, moto, etc.):", "");
+
+    // ✏️ NUEVO: si el carrito actual viene de un pedido guardado que ya se
+    // cargó en esta sesión (pedidoGuardadoActualId), se ofrece sobrescribir
+    // ESE mismo pedido en vez de crear uno nuevo — así, si solo le
+    // agregaste o quitaste productos, no queda un pedido viejo "huérfano"
+    // que haya que borrar a mano.
+    const quotes = getSavedQuotes();
+    const pedidoActual = pedidoGuardadoActualId
+      ? quotes.find(q => q.id === pedidoGuardadoActualId)
+      : null;
+
+    if (pedidoActual) {
+      const sobrescribir = confirm(
+        `Este carrito viene del pedido guardado "${pedidoActual.nombre}".\n\n` +
+        `Aceptar = sobrescribir "${pedidoActual.nombre}" con el carrito actual.\n` +
+        `Cancelar = guardar como un pedido NUEVO (el anterior no se toca).`
+      );
+      if (sobrescribir) {
+        sobrescribirPedidoGuardado(pedidoActual.id);
+        return;
+      }
+      // Si eligió "Cancelar" acá, sigue abajo y guarda como nuevo pedido.
+    }
+
+    const nombre = prompt("Nombre o referencia para este pedido (ej: cliente, moto, etc.):", pedidoActual ? pedidoActual.nombre : "");
     if (nombre === null) return; // canceló
 
-    const quotes = getSavedQuotes();
     const total = getCartTotal();
+    const nuevoId = Date.now();
     quotes.push({
-      id: Date.now(),
+      id: nuevoId,
       nombre: nombre.trim() || "Sin nombre",
       fecha: new Date().toLocaleString(),
       total,
@@ -3316,8 +3438,34 @@ function mostrarSugerencias(code) {
       items: JSON.parse(JSON.stringify(cart))
     });
     setSavedQuotes(quotes);
+    pedidoGuardadoActualId = nuevoId; // el carrito ahora "es" este pedido nuevo
     showToast("💾 Pedido guardado. Puedes recuperarlo en 'Pedidos guardados'.");
   };
+
+  // ✏️ NUEVO: sobrescribe un pedido guardado existente (mismo id) con el
+  // contenido ACTUAL del carrito, conservando el nombre original salvo que
+  // se pida cambiarlo. Actualiza también la fecha, para saber cuándo se
+  // modificó por última vez.
+  function sobrescribirPedidoGuardado(id) {
+    const quotes = getSavedQuotes();
+    const idx = quotes.findIndex(q => q.id === id);
+    if (idx === -1) {
+      showToast("⚠️ Ese pedido guardado ya no existe.");
+      return;
+    }
+
+    quotes[idx] = {
+      ...quotes[idx],
+      fecha: new Date().toLocaleString(),
+      total: getCartTotal(),
+      subtotal: getCartSubtotal(),
+      adjustment: { ...cartAdjustment },
+      items: JSON.parse(JSON.stringify(cart))
+    };
+    setSavedQuotes(quotes);
+    pedidoGuardadoActualId = id;
+    showToast(`✏️ Pedido "${quotes[idx].nombre}" actualizado con el carrito actual.`);
+  }
 
   // 🖨️ Generar cotización imprimible del carrito, SIN registrar venta ni
   // afectar el inventario. Sirve para clientes que solo quieren conocer precios.
@@ -3365,6 +3513,7 @@ function mostrarSugerencias(code) {
           </div>
           <div class="quote-actions">
             <button class="load-quote-btn" onclick="cargarPedidoGuardado(${q.id})">📥 Cargar</button>
+            <button class="load-quote-btn" onclick="sobrescribirPedidoGuardadoDesdeLista(${q.id})" data-tooltip="Reemplaza este pedido guardado por lo que tengas ahora mismo en el carrito">✏️ Sobrescribir</button>
             <button class="delete-quote-btn" onclick="eliminarPedidoGuardado(${q.id})">🗑️</button>
           </div>
         </div>
@@ -3380,6 +3529,8 @@ function mostrarSugerencias(code) {
     if (cart.length > 0) {
       if (!confirm("Esto reemplazará el carrito actual por el pedido guardado. ¿Continuar?")) return;
     }
+
+    pedidoGuardadoActualId = quote.id; // ✏️ este carrito ahora "es" este pedido guardado, hasta que se vacíe o se venda
 
     const itemsGuardados = JSON.parse(JSON.stringify(quote.items));
 
@@ -3502,6 +3653,25 @@ function mostrarSugerencias(code) {
     showToast(preciosActualizados > 0
       ? `📥 Pedido "${quote.nombre}" cargado. Se actualizaron ${preciosActualizados} producto(s) con los datos vigentes del catálogo.`
       : `📥 Pedido "${quote.nombre}" cargado en el carrito.`);
+  }
+
+  // ✏️ NUEVO: sobrescribir un pedido guardado directamente desde la lista
+  // (sin necesidad de haberlo "cargado" antes en esta sesión) con lo que
+  // haya AHORA MISMO en el carrito. Útil cuando armaste un carrito nuevo y
+  // querés que reemplace a un pedido guardado viejo, en vez de guardar uno
+  // aparte y borrar el viejo a mano.
+  function sobrescribirPedidoGuardadoDesdeLista(id) {
+    if (cart.length === 0) {
+      alert("⚠️ El carrito está vacío. Agrega los productos que quieres guardar antes de sobrescribir un pedido.");
+      return;
+    }
+    const quote = getSavedQuotes().find(q => q.id === id);
+    if (!quote) return;
+
+    if (!confirm(`Esto reemplazará el pedido guardado "${quote.nombre}" por el contenido actual del carrito. ¿Continuar?`)) return;
+
+    sobrescribirPedidoGuardado(id);
+    renderQuotesList();
   }
 
   function eliminarPedidoGuardado(id) {
@@ -3684,6 +3854,7 @@ function mostrarSugerencias(code) {
     if (cart.length === 0) return showToast("El carrito ya está vacío.");
     if (confirm("¿Deseas eliminar todos los productos del carrito?")) {
       cart = [];
+      pedidoGuardadoActualId = null; // ✏️ ya no representa ningún pedido guardado
       resetCartAdjustment();
       updateCartDisplay();
 
@@ -4705,6 +4876,7 @@ function mostrarSugerencias(code) {
     });
 
     cart = [];
+    pedidoGuardadoActualId = null; // ✏️ la venta ya se cobró: el próximo carrito no representa ningún pedido guardado
     idTransaccionVentaActual = null; // 🔐 esta venta ya quedó confirmada: la próxima debe llevar un ID nuevo
     resetCartAdjustment();
     updateCartDisplay();

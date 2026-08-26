@@ -1746,6 +1746,13 @@ body.admin-logged-in .admin-only {
   // evitar registrar la venta dos veces. Se limpia (para que la próxima
   // venta genere un ID nuevo) apenas el carrito se vacía con éxito.
   let idTransaccionVentaActual = null;
+  // 🔐 NUEVO: mismo mecanismo anti-duplicados que ya tenía la venta
+  // (idTransaccionVentaActual), aplicado a las devoluciones. Antes las
+  // devoluciones no mandaban ningún identificador de transacción, así que
+  // el backend no tenía forma de detectar una devolución reenviada
+  // (reintento automático, doble clic, corte de conexión) y podía llegar
+  // a reversar la misma venta dos veces.
+  let idTransaccionDevolucionActual = null;
   let productosData = []; // guarda referencia a todos los productos renderizados
 
   // 🔧 Variables de estado consolidadas aquí arriba (antes se declaraban más
@@ -3221,6 +3228,11 @@ function mostrarSugerencias(code) {
       factorDescuento,
       cliente: { nombre: r[2] || "", cedula: r[3] || "", telefono: r[4] || "" }
     };
+    // 🔐 Nuevo contexto de devolución (otro recibo, u otra vez que se abre
+    // el modal): se necesita un transaccionId nuevo. Si el usuario
+    // reintenta DENTRO de este mismo contexto (por una falla de red), el
+    // ID se reutiliza — ver confirmarDevolucion().
+    idTransaccionDevolucionActual = null;
 
     document.getElementById("devolucionInfo").innerHTML =
       `Recibo #${r[0]} ${r[2] ? "· " + r[2] : ""} · ${r[1]}` +
@@ -3282,6 +3294,16 @@ function mostrarSugerencias(code) {
     const motivo = document.getElementById("devolucionMotivo").value.trim();
 
     try {
+      // 🔐 Se reutiliza el mismo ID si esta devolución (mismo recibo, mismo
+      // modal abierto) ya se intentó mandar antes y no se confirmó éxito;
+      // si es el primer intento, se genera uno nuevo. Así el backend puede
+      // detectar si esta misma devolución llega duplicada.
+      if (!idTransaccionDevolucionActual) {
+        idTransaccionDevolucionActual = (crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      }
+
       // 🔁 Mismo arreglo aplicado a la venta: Apps Script a veces falla de
       // forma transitoria y devuelve una página HTML de error de Google en
       // vez del JSON esperado. Se reintenta una vez y se lee el texto crudo
@@ -3297,6 +3319,7 @@ function mostrarSugerencias(code) {
           body: JSON.stringify({
             action: "registrarDevolucion",
             apiKey: WEBAPP_API_KEY,
+            transaccionId: idTransaccionDevolucionActual,
             numeroReciboOriginal: numeroOriginal,
             motivo,
             entorno: ENTORNO,
@@ -3329,6 +3352,7 @@ function mostrarSugerencias(code) {
       } else {
         showToast("✅ Devolución registrada e inventario actualizado.");
         document.getElementById("devolucionModal").style.display = "none";
+        idTransaccionDevolucionActual = null; // 🔐 esta devolución ya quedó confirmada: la próxima debe llevar un ID nuevo
 
         const totalDevuelto = itemsADevolver.reduce((s, it) => s + it.qty * it.price, 0);
         mostrarRecibo({

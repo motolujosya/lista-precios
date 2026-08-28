@@ -3825,7 +3825,11 @@ function mostrarSugerencias(code) {
       cerrarLoginAdmin();
       aplicarEstadoAdmin();
       showToast("✅ Acceso de administrador activado.");
-      revisarInventarioBajoUnaVez();
+      // 📦 A pedido: ya NO se abre automáticamente la ventana de "Alerta de
+      // inventario" al autenticarse como admin (antes se llamaba aquí a
+      // revisarInventarioBajoUnaVez()). Sigue disponible cuando se
+      // necesite, a demanda, desde el botón "📦 Inventario" de la barra de
+      // herramientas (abrirAlertaInventarioManual).
       revisarCodigosDuplicadosUnaVez();
     } else {
       document.getElementById("adminLoginError").textContent = "Contraseña incorrecta.";
@@ -5240,13 +5244,14 @@ function parseFechaSheet(val) {
     try {
       await cargarHistorialRowsCache();
 
-      // Por defecto: últimos 15 días (incluyendo hoy), igual que el historial
+      // 📅 Por defecto: desde el inicio del mes actual hasta hoy (antes eran
+      // los últimos 15 días, igual que el historial; el dashboard ahora
+      // arranca mostrando "lo que va del mes").
       const hoy = new Date();
-      const hace15 = new Date();
-      hace15.setDate(hoy.getDate() - 14);
+      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
       document.getElementById("dashboardHasta").value = formatFechaISO(hoy);
-      document.getElementById("dashboardDesde").value = formatFechaISO(hace15);
+      document.getElementById("dashboardDesde").value = formatFechaISO(inicioMes);
 
       renderDashboard();
       document.getElementById("dashboardModal").style.display = "flex";

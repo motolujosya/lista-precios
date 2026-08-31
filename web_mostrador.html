@@ -659,8 +659,7 @@
   .dash-top-table th { background: #007bff; color: white; padding: 6px 8px; text-align: left; }
   .dash-top-table td { border: 1px solid #ddd; padding: 5px 8px; }
   .dash-top-table tr:nth-child(even) { background: #f9f9f9; }
-  .dash-top-table td:nth-child(2), .dash-top-table td:nth-child(3),
-  .dash-top-table th:nth-child(2), .dash-top-table th:nth-child(3) { text-align: right; }
+  .dash-top-table td:nth-child(n+3), .dash-top-table th:nth-child(n+3) { text-align: right; }
 
 
   /* =========================
@@ -1598,7 +1597,19 @@ body.admin-logged-in .admin-only {
       </div>
     </div>
 
-    <div class="dash-section-title">🏆 Top productos más vendidos</div>
+    <div class="dash-section-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <span>🏆 Top productos más vendidos</span>
+      <label style="font-size:13px; font-weight:normal; display:flex; align-items:center; gap:6px;">
+        Ordenar por:
+        <select id="dashboardTopOrden" onchange="renderTopProductosTabla()">
+          <option value="subtotal">Total $ vendido</option>
+          <option value="cantidad">Unidades vendidas</option>
+          <option value="margen">Margen $</option>
+          <option value="publico">Ventas a Público $</option>
+          <option value="taller">Ventas a Taller $</option>
+        </select>
+      </label>
+    </div>
     <div id="dashboardTopProductos"></div>
   </div>
 </div>
@@ -5222,11 +5233,20 @@ function parseFechaSheet(val) {
       margenTotal += margen;
       ventasPorTipo[tipoVenta] += subtotal;
 
-      if (!porProducto.has(codigo)) porProducto.set(codigo, { nombre, cantidad: 0, subtotal: 0 });
+      // 🆕 Además de cantidad y subtotal, ahora se acumula por producto:
+      // el margen ($) y el $ vendido desglosado por tarifa (Público /
+      // Taller), para poder ordenar/filtrar el top de productos por esas
+      // columnas.
+      if (!porProducto.has(codigo)) {
+        porProducto.set(codigo, { nombre, cantidad: 0, subtotal: 0, margen: 0, publico: 0, taller: 0 });
+      }
       const p = porProducto.get(codigo);
       p.nombre = nombre; // se queda con el nombre de la fila más reciente vista
       p.cantidad += cantidad;
       p.subtotal += subtotal;
+      p.margen += margen;
+      if (tipoVenta === "Publico") p.publico += subtotal;
+      if (tipoVenta === "Taller") p.taller += subtotal;
     });
 
     return { resumenDias, margenPorDia, margenTotal, ventasPorTipo, porProducto };
@@ -5362,7 +5382,7 @@ function parseFechaSheet(val) {
       renderChartLinea("chartMargenDia", fechasOrdenadas, margenPctPorDia, "Margen %");
     }
 
-    // --- Top productos más vendidos (por $ vendido, top 10) ---
+    // --- Top productos más vendidos ---
     // 🆕 "porProducto" ahora está agrupado por CÓDIGO (ver
     // calcularAgregadosPeriodo). Para el nombre a mostrar, se prioriza el
     // nombre ACTUAL del catálogo (productosData, buscado por código) sobre
@@ -5372,23 +5392,66 @@ function parseFechaSheet(val) {
     // (se eliminó, o la fila es de antes de guardar código y no hay con
     // qué buscarlo), se usa como respaldo el nombre que quedó guardado en
     // "Ventas" al momento de la venta.
-    const topProductos = [...porProducto.entries()]
-      .map(([codigo, v]) => {
-        const enCatalogo = codigo && !codigo.startsWith("__sin_codigo__")
-          ? productosData.find(p => (p.code || "").toString().trim() === codigo)
-          : null;
-        const nombre = (enCatalogo && enCatalogo.name) ? enCatalogo.name : v.nombre;
-        return { codigo, nombre, cantidad: v.cantidad, subtotal: v.subtotal };
-      })
-      .sort((a, b) => b.subtotal - a.subtotal)
+    //
+    // 🆕 Se guarda la lista COMPLETA (no solo el top 10) en una variable
+    // aparte, para que cambiar el criterio de orden (selector "Ordenar
+    // por") solo tenga que reordenar y recortar esta lista ya calculada
+    // — sin tener que recorrer de nuevo todo "historialRowsCache" ni
+    // volver a dibujar los gráficos.
+    dashboardTopProductosCache = [...porProducto.entries()].map(([codigo, v]) => {
+      const enCatalogo = codigo && !codigo.startsWith("__sin_codigo__")
+        ? productosData.find(p => (p.code || "").toString().trim() === codigo)
+        : null;
+      const nombre = (enCatalogo && enCatalogo.name) ? enCatalogo.name : v.nombre;
+      return {
+        codigo, nombre,
+        cantidad: v.cantidad, subtotal: v.subtotal,
+        margen: v.margen, publico: v.publico, taller: v.taller
+      };
+    });
+
+    renderTopProductosTabla();
+  }
+
+  // 🆕 Variable a nivel de módulo: guarda el resultado completo (sin
+  // recortar a 10) de la última vez que se calculó el top de productos,
+  // para que el selector "Ordenar por" pueda reordenar sin recalcular.
+  let dashboardTopProductosCache = [];
+
+  // 🆕 Dibuja SOLO la tabla de top de productos, ordenada/filtrada según
+  // el criterio elegido en el selector "Ordenar por" (Total $, Unidades,
+  // Margen $, Ventas a Público $, Ventas a Taller $). Se llama tanto
+  // desde renderDashboard() (primera carga o cambio de fechas) como
+  // directamente desde el onchange del selector (sin recalcular nada más
+  // del dashboard).
+  function renderTopProductosTabla() {
+    const criterio = document.getElementById("dashboardTopOrden")?.value || "subtotal";
+
+    const topProductos = [...dashboardTopProductosCache]
+      .sort((a, b) => (b[criterio] || 0) - (a[criterio] || 0))
       .slice(0, 10);
 
-    let topHTML = `<table class="dash-top-table"><thead><tr><th>Producto</th><th>Unidades</th><th>Total $</th></tr></thead><tbody>`;
+    let topHTML = `<table class="dash-top-table"><thead><tr>
+      <th>Código</th><th>Producto</th><th>Unidades</th>
+      <th>Margen $</th><th>Público $</th><th>Taller $</th><th>Total $</th>
+    </tr></thead><tbody>`;
     if (topProductos.length === 0) {
-      topHTML += `<tr><td colspan="3" style="text-align:center;color:#999;">Sin ventas registradas en este rango de fechas.</td></tr>`;
+      topHTML += `<tr><td colspan="7" style="text-align:center;color:#999;">Sin ventas registradas en este rango de fechas.</td></tr>`;
     } else {
       topProductos.forEach(p => {
-        topHTML += `<tr><td>${p.nombre}</td><td>${p.cantidad}</td><td>${formatCurrency(p.subtotal)}</td></tr>`;
+        // El código puede venir vacío en ventas muy antiguas (de antes de
+        // guardarlo); en ese caso se muestra "—" en vez del marcador
+        // interno "__sin_codigo__..." usado solo para agrupar.
+        const codigoVisible = p.codigo.startsWith("__sin_codigo__") ? "—" : p.codigo;
+        topHTML += `<tr>
+          <td>${codigoVisible}</td>
+          <td>${p.nombre}</td>
+          <td>${p.cantidad}</td>
+          <td>${formatCurrency(p.margen)}</td>
+          <td>${formatCurrency(p.publico)}</td>
+          <td>${formatCurrency(p.taller)}</td>
+          <td>${formatCurrency(p.subtotal)}</td>
+        </tr>`;
       });
     }
     topHTML += `</tbody></table>`;

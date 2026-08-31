@@ -1563,7 +1563,7 @@ body.admin-logged-in .admin-only {
     </div>
     <div id="totalesPorDia" style="margin:10px 0; font-weight:bold;"></div>
     <table id="historialTable">
-      <thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th><th>% Ganancia</th></tr></thead>
       <tbody id="historialBody"></tbody>
     </table>
   </div>
@@ -5034,8 +5034,32 @@ function parseFechaSheet(val) {
       text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]
     );
 
+    // 🩹 FIX: antes se usaba SIEMPRE "c.f || c.v" (el valor FORMATEADO de
+    // la celda, si existe). Para columnas de texto (fecha, producto,
+    // código, etc.) eso es correcto e inofensivo. Pero para columnas
+    // NUMÉRICAS (cantidad, precio, subtotal, margen, "Margen %", etc.),
+    // "c.f" depende del formato de celda y del idioma configurado en la
+    // hoja — por ejemplo, si la columna "Margen %" tiene formato de
+    // Porcentaje, o si la hoja usa coma como separador decimal (formato
+    // regional de Colombia), "c.f" puede llegar como "30,5" o "30,5%" en
+    // vez de "30.5". Number("30,5") o Number("30,5%") dan NaN en
+    // JavaScript, y como el código de "% Ganancia" (y otros cálculos)
+    // usa Number(...) sobre estas columnas, esa fila terminaba mostrando
+    // "—" en el historial aunque la hoja de cálculo sí mostrara el
+    // porcentaje correctamente (Sheets sabe interpretar su propio
+    // formato regional; JavaScript con Number() no).
+    //
+    // La solución: cuando Google ya nos dice que la celda es de tipo
+    // número (c.v es un number de JS), usamos ESE valor crudo
+    // directamente — nunca depende de formato ni de idioma. Solo se cae a
+    // "c.f" cuando el valor no es numérico (texto), donde este problema
+    // no existe.
     historialRowsCache = json.table.rows.map(r =>
-      r.c.map(c => c ? (c.f || c.v) : "")
+      r.c.map(c => {
+        if (!c) return "";
+        if (typeof c.v === "number") return c.v;
+        return (c.f !== undefined && c.f !== null) ? c.f : (c.v ?? "");
+      })
     );
   }
 
@@ -5081,7 +5105,7 @@ function parseFechaSheet(val) {
     if (rows.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" style="text-align:center">
+          <td colspan="6" style="text-align:center">
             Sin ventas registradas en este rango de fechas.
           </td>
         </tr>`;
@@ -5095,6 +5119,17 @@ function parseFechaSheet(val) {
         const fechaDia = fechaVisible.split(" ")[0];
 
         const subtotal = Number(r[4]) || 0;
+
+        // 🆕 % Ganancia: viene precalculado desde el backend en la columna
+        // "Margen %" (L, índice 11) de la hoja "Ventas" — margen sobre el
+        // precio de venta, no markup sobre costo. Puede venir vacío en
+        // filas antiguas (de antes de que existiera esa columna) o cuando
+        // el producto no tiene "precio compra" cargado en el catálogo; en
+        // esos casos se muestra "—" en vez de un número inventado.
+        const margenPorcentaje = r[11];
+        const margenTexto = (margenPorcentaje === "" || margenPorcentaje === null || margenPorcentaje === undefined || isNaN(Number(margenPorcentaje)))
+          ? "—"
+          : `${Number(margenPorcentaje).toFixed(1)}%`;
 
         // acumular total diario
         if (!resumenDias[fechaDia]) {
@@ -5110,6 +5145,7 @@ function parseFechaSheet(val) {
             <td>${r[2] || 0}</td>
             <td>${formatCurrency(r[3])}</td>
             <td>${formatCurrency(subtotal)}</td>
+            <td>${margenTexto}</td>
           </tr>`;
         });
     }
@@ -5154,13 +5190,27 @@ function parseFechaSheet(val) {
     const margenPorDia = {};     // fecha -> margen
     let margenTotal = 0;
     const ventasPorTipo = { Publico: 0, Taller: 0, "—": 0 };
-    const porProducto = new Map(); // nombre -> { cantidad, subtotal }
+    const porProducto = new Map(); // codigo -> { nombre (último visto, de respaldo), cantidad, subtotal }
 
     (historialRowsCache || []).forEach(r => {
       const fechaDia = (r[0] || "").toString().split(" ")[0];
       if (desdeStr && fechaDia < desdeStr) return;
       if (hastaStr && fechaDia > hastaStr) return;
 
+      // 🆕 El "Top productos" se agrupa por CÓDIGO (columna G, r[6]), no por
+      // el texto del nombre guardado en cada fila de "Ventas". Antes se
+      // agrupaba por nombre, así que si un producto se renombró en el
+      // catálogo en algún momento, sus ventas de antes y de después del
+      // cambio de nombre quedaban repartidas en DOS filas distintas del
+      // top (subestimando cuánto se vendió realmente de ese producto). El
+      // código es el identificador estable de cada producto en todo el
+      // sistema (venta, devolución, stock), así que agrupar por código
+      // reúne correctamente todo lo vendido de un mismo producto sin
+      // importar qué nombre tuviera en cada momento. Si una fila no trae
+      // código (ventas muy antiguas, de antes de que se guardara), se cae
+      // de vuelta al nombre como identificador — mejor que perder esa
+      // fila del conteo.
+      const codigo = (r[6] || "").toString().trim() || `__sin_codigo__${r[1] || "—"}`;
       const nombre = r[1] || "—";
       const cantidad = Number(r[2]) || 0;
       const subtotal = Number(r[4]) || 0;
@@ -5172,8 +5222,9 @@ function parseFechaSheet(val) {
       margenTotal += margen;
       ventasPorTipo[tipoVenta] += subtotal;
 
-      if (!porProducto.has(nombre)) porProducto.set(nombre, { cantidad: 0, subtotal: 0 });
-      const p = porProducto.get(nombre);
+      if (!porProducto.has(codigo)) porProducto.set(codigo, { nombre, cantidad: 0, subtotal: 0 });
+      const p = porProducto.get(codigo);
+      p.nombre = nombre; // se queda con el nombre de la fila más reciente vista
       p.cantidad += cantidad;
       p.subtotal += subtotal;
     });
@@ -5312,8 +5363,23 @@ function parseFechaSheet(val) {
     }
 
     // --- Top productos más vendidos (por $ vendido, top 10) ---
+    // 🆕 "porProducto" ahora está agrupado por CÓDIGO (ver
+    // calcularAgregadosPeriodo). Para el nombre a mostrar, se prioriza el
+    // nombre ACTUAL del catálogo (productosData, buscado por código) sobre
+    // el nombre que quedó guardado en la fila de la venta — así, si el
+    // producto se renombró después de venderse, el top siempre muestra el
+    // nombre vigente hoy. Si el producto ya no existe en el catálogo
+    // (se eliminó, o la fila es de antes de guardar código y no hay con
+    // qué buscarlo), se usa como respaldo el nombre que quedó guardado en
+    // "Ventas" al momento de la venta.
     const topProductos = [...porProducto.entries()]
-      .map(([nombre, v]) => ({ nombre, ...v }))
+      .map(([codigo, v]) => {
+        const enCatalogo = codigo && !codigo.startsWith("__sin_codigo__")
+          ? productosData.find(p => (p.code || "").toString().trim() === codigo)
+          : null;
+        const nombre = (enCatalogo && enCatalogo.name) ? enCatalogo.name : v.nombre;
+        return { codigo, nombre, cantidad: v.cantidad, subtotal: v.subtotal };
+      })
       .sort((a, b) => b.subtotal - a.subtotal)
       .slice(0, 10);
 

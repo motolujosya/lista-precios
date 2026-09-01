@@ -660,6 +660,9 @@
   .dash-top-table td { border: 1px solid #ddd; padding: 5px 8px; }
   .dash-top-table tr:nth-child(even) { background: #f9f9f9; }
   .dash-top-table td:nth-child(n+3), .dash-top-table th:nth-child(n+3) { text-align: right; }
+  .dash-top-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+  .dash-orden-label { display: flex; flex-direction: column; font-size: 12px; color: #555; gap: 3px; font-weight: normal; }
+  .dash-orden-label select { padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; color: #333; background: #fff; height: 33px; }
 
 
   /* =========================
@@ -1162,6 +1165,13 @@
 
 
 /* 🎨 Botones modernos de las tarjetas */
+.card-actions-buttons-wrap { width: 100%; }
+.cp-margen-badge {
+  text-align: center;
+  color: #888;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
 .card-actions-buttons {
   display: flex;
   gap: 8px;
@@ -1597,10 +1607,10 @@ body.admin-logged-in .admin-only {
       </div>
     </div>
 
-    <div class="dash-section-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-      <span>🏆 Top productos más vendidos</span>
-      <label style="font-size:13px; font-weight:normal; display:flex; align-items:center; gap:6px;">
-        Ordenar por:
+    <div class="dash-top-header">
+      <div class="dash-section-title" style="margin:0;">🏆 Top productos más vendidos</div>
+      <label class="dash-orden-label">
+        Ordenar por
         <select id="dashboardTopOrden" onchange="renderTopProductosTabla()">
           <option value="subtotal">Total $ vendido</option>
           <option value="cantidad">Unidades vendidas</option>
@@ -2015,9 +2025,26 @@ body.admin-logged-in .admin-only {
       // sin login (mismo criterio que "Precio Taller" o "Ver más").
       const nota = (obj["notas"] || "").toString().trim();
 
+      // 🆕 % de ganancia por producto: viene YA CALCULADO desde la hoja
+      // "Lista", columna F "Porcentaje ganancia" — no se recalcula nada
+      // en el navegador ni se expone el costo del producto (ese dato
+      // sigue sin salir del backend). Si la celda viene vacía o no es un
+      // número válido, se guarda como null y simplemente no se muestra
+      // esa línea en la tarjeta.
+      //
+      // 🩹 FIX: esa columna tiene formato de Porcentaje en Google Sheets,
+      // así que el valor CRUDO que llega es una fracción (0.2 para "20%"
+      // como se ve en la hoja), no el número ya multiplicado. Sin este
+      // ajuste, la tarjeta mostraba "0.2%" en vez de "20%". Se corrige
+      // multiplicando por 100 aquí, una sola vez, en el origen del dato.
+      const margenRaw = obj["porcentaje ganancia"];
+      const margenPct = (margenRaw !== undefined && margenRaw !== "" && !isNaN(Number(margenRaw)))
+        ? Number(margenRaw) * 100
+        : null;
+
       if (!name) return;
 
-      productosData.push({ name, code, info, marca, stock, price, priceDesc, foto, relacionados, umbral, nota });
+      productosData.push({ name, code, info, marca, stock, price, priceDesc, foto, relacionados, umbral, nota, margenPct });
 
       const stockClass = stock === 0 ? "stock-out" : stock <= 3 ? "stock-low" : "stock-ok";
       const stockLabel = stock === 0 ? "❌ Sin stock" : stock <= 3 ? `⚠️ Últimas ${stock} unidades` : `✅ En stock: ${stock}`;
@@ -2046,9 +2073,12 @@ body.admin-logged-in .admin-only {
             <option value="${price}">Precio Publico: ${formatCurrency(price)}</option>
             <option value="${priceDesc}" class="admin-only-block">Precio Taller: ${formatCurrency(priceDesc)}</option>
           </select>
-          <div class="card-actions-buttons">
-            <button class="add-btn" ${stock === 0 ? "disabled" : ""} title="${stock === 0 ? "Sin stock disponible" : "Agregar al carrito"}" aria-label="${stock === 0 ? "Sin stock disponible" : "Agregar al carrito"}">${stock === 0 ? "🚫" : "🛒"}</button>
-            <button class="copy-btn" title="Copiar para WhatsApp" aria-label="Copiar para WhatsApp">📋</button>
+          <div class="card-actions-buttons-wrap">
+            ${margenPct !== null ? `<div class="cp-margen-badge admin-only-block">${margenPct.toFixed(1)}%</div>` : ""}
+            <div class="card-actions-buttons">
+              <button class="add-btn" ${stock === 0 ? "disabled" : ""} title="${stock === 0 ? "Sin stock disponible" : "Agregar al carrito"}" aria-label="${stock === 0 ? "Sin stock disponible" : "Agregar al carrito"}">${stock === 0 ? "🚫" : "🛒"}</button>
+              <button class="copy-btn" title="Copiar para WhatsApp" aria-label="Copiar para WhatsApp">📋</button>
+            </div>
           </div>
           ${link ? `<p class="admin-only-block"><a href="${link}" target="_blank">🔗 Ver más</a></p>` : ""}
         </div>
@@ -2351,17 +2381,6 @@ body.admin-logged-in .admin-only {
   // esté abierta; es un recordatorio visual para esta sesión, no se guarda
   // en ningún lado permanente).
   let inventarioBajoYaPedido = new Set();
-  // 📥 Estado del checkbox "Filtrar" junto al botón de exportar. Cuando
-  // está activo, la exportación respeta la(s) marca(s) seleccionada(s)
-  // arriba (o incluye todas si no hay ninguna elegida) y EXCLUYE los
-  // productos ya marcados como "ya pedido". Cuando está desactivado,
-  // exporta absolutamente todo, sin importar el filtro de marca ni si
-  // algo ya fue marcado.
-  let inventarioFiltrarExportarActivo = false;
-
-  function toggleFiltrarExportarInventario(activo) {
-    inventarioFiltrarExportarActivo = activo;
-  }
 
   function calcularInventarioBajo() {
     const sinStock = [];
@@ -2460,12 +2479,12 @@ body.admin-logged-in .admin-only {
     const todos = [...inventarioBajoSinStock, ...inventarioBajoStockBajo];
     const hayFiltroMarcaActivo = inventarioBajoMarcasSeleccionadas.size > 0;
 
-    // 🔘 Checkbox "Filtrar": si está marcado, se incluye solo la(s)
-    // marca(s) elegida(s) arriba (o todas si no hay ninguna elegida) y se
-    // excluyen los productos ya marcados como "ya pedido". Si está sin
-    // marcar, se exporta todo tal cual, ignorando ambos filtros.
+    // 🔘 Antes esto dependía de un checkbox "Filtrar" que había que marcar
+    // a mano. Ahora la exportación SIEMPRE respeta el filtro de marca que
+    // esté activo en ese momento (los chips de arriba) y SIEMPRE excluye
+    // los productos ya marcados como "ya pedido" — igual que la lista que
+    // se está viendo en pantalla, sin pasos extra.
     const pasaFiltro = p => {
-      if (!inventarioFiltrarExportarActivo) return true;
       const pasaMarca = !hayFiltroMarcaActivo || inventarioBajoMarcasSeleccionadas.has(p.marca);
       const noEstaYaPedido = !inventarioBajoYaPedido.has(p.code);
       return pasaMarca && noEstaYaPedido;
@@ -2551,10 +2570,6 @@ body.admin-logged-in .admin-only {
       `).join("") + `</div>`;
     }
     html += `<button class="inv-btn-exportar" onclick="exportarInventarioBajoCSV()">📥 Exportar a Excel</button>`;
-    html += `<label class="inv-filtrar-exportar-check" data-tooltip="Si está marcado: exporta solo la(s) marca(s) seleccionada(s) arriba (o todas si no elegiste ninguna) y excluye los productos ya marcados como 'ya pedido'. Si está sin marcar: exporta absolutamente todo.">
-      <input type="checkbox" id="inventarioFiltrarExportarCheck" ${inventarioFiltrarExportarActivo ? "checked" : ""} onchange="toggleFiltrarExportarInventario(this.checked)">
-      Filtrar
-    </label>`;
     html += `</div>`;
 
     if (sinStock.length > 0) {
@@ -5720,6 +5735,11 @@ function agregarTarjetaProducto(p, { esSugerencia = false } = {}) {
       <button class="cp-add-btn cp-add-taller" data-precio="${precioTallerNum}" ${stock === 0 ? "disabled" : ""}>+ Agregar</button>
     </span>
   </div>` : ""}
+  ${(p.margen_pct !== undefined && p.margen_pct !== null && !isNaN(Number(p.margen_pct))) ? `
+  <div class="cp-row admin-only">
+    <span style="color:#888; font-size:11px;">Margen</span>
+    <span style="color:#888; font-size:11px;">${Number(p.margen_pct).toFixed(1)}%</span>
+  </div>` : ""}
   <div class="cp-row${stock === 0 ? "" : " admin-only"}"><span>Stock</span><span class="${stockClase}">${stockTexto}</span></div>
   ${p.info ? `<div class="cp-info">${p.info}</div>` : ""}
 `;
@@ -5792,6 +5812,7 @@ function mostrarSugerenciasEnChat(code) {
         stock: p.stock,
         precio: p.price,
         precio_taller: p.priceDesc,
+        margen_pct: p.margenPct,
       },
       { esSugerencia: true }
     );

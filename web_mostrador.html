@@ -314,6 +314,19 @@
     color: #777;
   }
   .cart-collapsible[open] > summary::after { content: "−"; }
+  /* 🩹 FIX móvil: "Datos del cliente" es un <details> con overflow:hidden
+     (para que el ＋/− y las esquinas redondeadas se vean bien cerrado).
+     Pero el listado de sugerencias de nombre/cédula (#clienteSugerencias)
+     es un div position:absolute que se dibuja DEBAJO de los inputs, fuera
+     de la caja "natural" del <details> — con overflow:hidden ese listado
+     quedaba cortado/incompleto (mucho más notorio en celulares angostos,
+     donde hay menos alto disponible). Al abrirse el panel, se permite que
+     el contenido se desborde visualmente para que el listado se vea
+     completo; esto no afecta el radio de bordes propio de la caja.
+  */
+  .cart-collapsible[open] {
+    overflow: visible;
+  }
   .cart-collapsible-body {
     padding: 0 10px 10px;
   }
@@ -1365,6 +1378,9 @@ body.admin-logged-in .admin-only {
   </div>
   <div id="cartItems"></div>
 
+  <div id="sugerenciasPanel" style="display:none; margin-bottom:12px; padding-top:10px; padding-bottom:10px;
+     border-top:1px solid #eee; border-bottom:1px solid #eee;"></div>
+
   <div class="cart-subtotal-row" id="cartSubtotalRow" style="display:none; justify-content:space-between; font-size:13px; color:#666;">
     <span>Subtotal:</span><span id="cartSubtotal">$0</span>
   </div>
@@ -1438,8 +1454,6 @@ body.admin-logged-in .admin-only {
       <span id="cambioCliente" style="font-size: 14px; font-weight: bold; color: #28a745;">$0</span>
     </div>
   </div>
-  <div id="sugerenciasPanel" style="display:none; margin-top:12px; padding-top:10px;
-     border-top:1px solid #eee;"></div>
   <div class="cart-actions">
     <div class="cart-action-item">
       <button id="cotizacionBtn" class="icon-btn" data-tooltip="Cotización" aria-label="Cotización">🖨️</button>
@@ -2987,7 +3001,7 @@ function renderSugerenciasPanel() {
       // (puede haber varios con nombres parecidos de distintas marcas).
       const codigoMarca = [p.code, p.marca].filter(Boolean).join(" · ");
       return `
-        <div style="display:flex; align-items:center; gap:8px; background:#f8f9fa;
+        <div style="display:flex; align-items:center; gap:8px; background:#FFDCDD;
                     border-radius:8px; padding:8px; margin-bottom:6px;">
           ${fotoUrl
             ? `<img src="${fotoUrl}" style="width:48px; height:48px; object-fit:contain;

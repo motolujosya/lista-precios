@@ -1400,7 +1400,7 @@ body.admin-logged-in .admin-only {
     </div>
 
     <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 2px;">
-      <label for="totalManual" style="font-size: 12px; color: #555; flex: 1;">Total manual</label>
+      <label for="totalManual" style="font-size: 12px; color: #555; flex: 1;" title="Puede ser menor (descuento) o mayor (incremento) que el subtotal. No se muestra desglosado en el recibo.">Total manual (± )</label>
       <input id="totalManual" type="number" min="0" step="any" placeholder="$"
         style="width: 90px; padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc; text-align: right; box-sizing: border-box;">
       <button id="aplicarTotalManualBtn" style="padding: 4px 8px; border: none; border-radius: 6px; background: linear-gradient(90deg, #00b09b, #96c93d); color: #fff; cursor: pointer; font-size: 12px;">Aplicar</button>
@@ -1819,9 +1819,10 @@ body.admin-logged-in .admin-only {
     return cart.reduce((s, i) => s + i.qty * i.price, 0);
   }
 
-  // Total final aplicando el descuento o el total manual, sin permitir
-  // que el descuento supere el valor de compra (el total nunca es negativo
-  // ni mayor que el subtotal real de los productos).
+  // Total final aplicando el % de descuento o el total manual. El % de
+  // descuento sigue limitado a 0-100% del subtotal. El total manual puede
+  // ser menor (descuento) o mayor (incremento) que el subtotal; en ambos
+  // casos el total nunca es negativo.
   function getCartTotal() {
     const subtotal = getCartSubtotal();
     if (subtotal <= 0) return 0;
@@ -1832,11 +1833,27 @@ body.admin-logged-in .admin-only {
     }
 
     if (cartAdjustment.type === "manual") {
-      const val = Math.min(Math.max(parseFloat(cartAdjustment.value) || 0, 0), subtotal);
+      // 💲 El total manual puede ser MENOR que el subtotal (descuento) o
+      // MAYOR que el subtotal (incremento/recargo); ya no se limita al
+      // valor del subtotal, solo se evita que sea negativo.
+      const val = Math.max(parseFloat(cartAdjustment.value) || 0, 0);
       return val;
     }
 
     return subtotal;
+  }
+
+  // 💲 Factor para "repartir" un INCREMENTO de precio entre los productos
+  // del carrito, de forma que el precio mostrado de cada producto ya
+  // incluya el aumento y sume exactamente el total (sin mostrar una línea
+  // aparte de "recargo"). Si el ajuste fue un DESCUENTO (total < subtotal),
+  // se devuelve 1 y los productos se muestran a su precio de lista normal,
+  // porque ese caso ya se explica con la línea "Subtotal / Descuento".
+  // subtotalRef/totalRef permiten calcularlo tanto en vivo (carrito
+  // abierto) como sobre los valores ya guardados de un recibo/cotización.
+  function getFactorIncrementoMostrado(subtotalRef, totalRef) {
+    if (!subtotalRef || subtotalRef <= 0) return 1;
+    return totalRef > subtotalRef ? (totalRef / subtotalRef) : 1;
   }
 
   function resetCartAdjustment() {
@@ -2737,18 +2754,16 @@ body.admin-logged-in .admin-only {
     showToast(`✅ Descuento de ${pct}% aplicado.`);
   };
 
-  // 💲 Aplicar total editado manualmente (no puede superar el subtotal real)
+  // 💲 Aplicar total editado manualmente. Puede ser MENOR que el subtotal
+  // (funciona como descuento) o MAYOR (funciona como incremento/recargo);
+  // en ambos casos el desglose no se muestra en el recibo/factura, solo
+  // el total final (igual que ya pasaba con el descuento).
   document.getElementById("aplicarTotalManualBtn").onclick = () => {
     if (cart.length === 0) return showToast("⚠️ El carrito está vacío.");
     const inputManual = document.getElementById("totalManual");
     let valor = parseFloat(inputManual.value);
     if (isNaN(valor)) return showToast("⚠️ Ingresa un valor de total válido.");
-    const subtotal = getCartSubtotal();
     if (valor < 0) valor = 0;
-    if (valor > subtotal) {
-      valor = subtotal;
-      showToast("⚠️ El descuento no puede superar el valor de compra del producto.");
-    }
     inputManual.value = valor;
     actualizarTotalManualFormateado();
     document.getElementById("descuentoPorcentaje").value = "";
@@ -3062,6 +3077,11 @@ function mostrarSugerencias(code) {
     guardarCarritoEnStorage(); // 💾 persiste el carrito ANTES de renderizar, para no perder nada si algo falla al pintar
 
     cartItemsDiv.innerHTML = "";
+    // 💲 Si hay un incremento manual aplicado, se reparte proporcionalmente
+    // entre los productos para que sus precios mostrados sumen el total
+    // (ver getFactorIncrementoMostrado). Si es un descuento, se deja el
+    // precio de lista normal porque el descuento ya se explica aparte.
+    const factorIncremento = getFactorIncrementoMostrado(getCartSubtotal(), getCartTotal());
     cart.forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "cart-row";
@@ -3072,7 +3092,7 @@ function mostrarSugerencias(code) {
       // recibo impreso y la cotización por WhatsApp — nada de eso cambia.
       row.innerHTML = `
         <span>${buildProductLabel(item.code, item.name, "")} x${item.qty}</span>
-        <span>${formatCurrency(item.price * item.qty)}</span>
+        <span>${formatCurrency(item.price * item.qty * factorIncremento)}</span>
         <button class="remove-item" title="Quitar producto" aria-label="Quitar producto">🗑️</button>
       `;
 
@@ -4438,7 +4458,10 @@ function mostrarSugerencias(code) {
       // datos guardados en el backend no cambian, esto es solo cómo se ve
       // el ticket físico.
       const descripcion = `${i.qty}x ${buildProductLabel(i.code, i.name, "")}`;
-      const precioTexto = formatCurrency(signo * i.qty * i.price);
+      // 💲 Si hubo un incremento manual, se reparte entre los productos
+      // para que sus precios sumen el total (ver getFactorIncrementoMostrado).
+      const factorIncremento = esDevolucion ? 1 : getFactorIncrementoMostrado(r.subtotal, r.total);
+      const precioTexto = formatCurrency(signo * i.qty * i.price * factorIncremento);
       imprimirFilaProducto(cmds, negrita, descripcion, precioTexto, ancho);
     });
 
@@ -4549,10 +4572,13 @@ function mostrarSugerencias(code) {
     // "info" larga — solo código + nombre. Esto es lo que se ve en
     // pantalla (#reciboPrint) y lo que sale al imprimir por navegador
     // (imprimirRecibo -> window.print()), así que el ajuste cubre ambos.
+    // 💲 Si hubo un incremento manual, se reparte entre los productos para
+    // que sus precios sumen el total (ver getFactorIncrementoMostrado).
+    const factorIncremento = esDevolucion ? 1 : getFactorIncrementoMostrado(r.subtotal, r.total);
     const filasHtml = r.items.map(i => `
       <tr>
         <td>${i.qty}x ${buildProductLabel(i.code, i.name, "")}</td>
-        <td style="text-align:right; white-space:nowrap;">${formatCurrency(signo * i.qty * i.price)}</td>
+        <td style="text-align:right; white-space:nowrap;">${formatCurrency(signo * i.qty * i.price * factorIncremento)}</td>
       </tr>
     `).join("");
 
@@ -4640,8 +4666,11 @@ function mostrarSugerencias(code) {
 
     // WhatsApp muestra únicamente código + nombre + precio.
     // La "info" interna del producto no se copia.
+    // 💲 Si hubo un incremento manual, se reparte entre los productos para
+    // que sus precios sumen el total (ver getFactorIncrementoMostrado).
+    const factorIncremento = esDevolucion ? 1 : getFactorIncrementoMostrado(r.subtotal, r.total);
     const lineasProductos = r.items
-      .map(i => `${i.qty}x ${buildProductLabel(i.code, i.name, "")} - ${formatCurrency(signo * i.qty * i.price)}`)
+      .map(i => `${i.qty}x ${buildProductLabel(i.code, i.name, "")} - ${formatCurrency(signo * i.qty * i.price * factorIncremento)}`)
       .join("\n");
 
     let texto = esDevolucion

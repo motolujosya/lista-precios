@@ -663,6 +663,12 @@
   .dash-kpi-label { font-size: 12px; color: #666; margin-bottom: 4px; }
   .dash-kpi-value { font-size: 17px; font-weight: bold; color: #222; }
   .dash-kpi-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .dash-kpi-clickable { cursor: pointer; border: 2px solid transparent; transition: transform 0.15s, border-color 0.15s, background 0.15s; user-select: none; }
+  .dash-kpi-clickable:hover { transform: scale(1.03); background: #eef2f7; }
+  .dash-kpi-clickable.dash-kpi-active { border-color: #00b09b; background: #e6f7f4; }
+  .dash-kpi-clickable .dash-kpi-hint { font-size: 10px; color: #00b09b; margin-top: 2px; font-weight: bold; }
+  .dash-filtro-activo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #00695c; background: #e6f7f4; border-radius: 8px; padding: 6px 10px; margin: 0 0 10px; }
+  .dash-filtro-activo button { background: #fff; color: #00695c; border: 1px solid #00b09b; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
   .dash-comparativo { background: #f5f5f5; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
   .dash-section-title { font-size: 14px; font-weight: bold; color: #333; margin: 18px 0 8px; }
   .dash-chart-box { position: relative; height: 240px; margin-bottom: 10px; }
@@ -1604,6 +1610,7 @@ body.admin-logged-in .admin-only {
       <button class="btn-ver-todo" onclick="limpiarFiltroDashboard()">Ver todo</button>
     </div>
 
+    <div id="dashboardFiltroActivo"></div>
     <div id="dashboardKpis" class="dash-kpis"></div>
     <div id="dashboardComparativo"></div>
 
@@ -1622,15 +1629,13 @@ body.admin-logged-in .admin-only {
     </div>
 
     <div class="dash-top-header">
-      <div class="dash-section-title" style="margin:0;">🏆 Top productos más vendidos</div>
+      <div class="dash-section-title" style="margin:0;">🏆 Top productos (regla 80/20)</div>
       <label class="dash-orden-label">
         Ordenar por
         <select id="dashboardTopOrden" onchange="renderTopProductosTabla()">
           <option value="subtotal">Total $ vendido</option>
           <option value="cantidad">Unidades vendidas</option>
           <option value="margen">Margen $</option>
-          <option value="publico">Ventas a Público $</option>
-          <option value="taller">Ventas a Taller $</option>
         </select>
       </label>
     </div>
@@ -5053,7 +5058,7 @@ function parseFechaSheet(val) {
   // criterio que usa renderHistorial para el periodo actual) para
   // cualquier rango de fechas — se reutiliza tanto para el periodo
   // mostrado como para el periodo anterior del comparativo.
-  function calcularResumenRango(desdeStr, hastaStr) {
+  function calcularResumenRango(desdeStr, hastaStr, tipoFiltro) {
     let total = 0;
     let margen = 0;
     const porTipo = { Publico: 0, Taller: 0, "—": 0 };
@@ -5064,11 +5069,16 @@ function parseFechaSheet(val) {
       if (hastaStr && fechaDia > hastaStr) return;
 
       const subtotal = Number(r[4]) || 0;
+      const tipoVenta = r[12] === "Publico" || r[12] === "Taller" ? r[12] : "—";
+      // "porTipo" siempre se acumula completo (igual que ventasPorTipo en
+      // calcularAgregadosPeriodo), pero total/margen sí respetan el filtro
+      // global de tipo de venta para que el comparativo sea consistente
+      // con lo que se está mostrando en el resto del dashboard.
+      porTipo[tipoVenta] += subtotal;
+      if (tipoFiltro && tipoVenta !== tipoFiltro) return;
+
       total += subtotal;
       margen += Number(r[8]) || 0;
-
-      const tipoVenta = r[12] === "Publico" || r[12] === "Taller" ? r[12] : "—";
-      porTipo[tipoVenta] += subtotal;
     });
 
     return { total, margen, publico: porTipo.Publico, taller: porTipo.Taller };
@@ -5254,11 +5264,20 @@ function parseFechaSheet(val) {
   // agregados que necesita el dashboard: total por día, margen por día,
   // ventas por tipo (Publico/Taller) y ventas agrupadas por producto
   // (para el ranking de más vendidos).
-  function calcularAgregadosPeriodo(desdeStr, hastaStr) {
+  // 🆕 tipoFiltro: "Publico" | "Taller" | null/undefined (sin filtro). Cuando
+  // viene definido, actúa como filtro GLOBAL del dashboard: todo lo que no
+  // sea de ese tipo de venta queda fuera de resumenDias/margenPorDia/
+  // margenTotal/porProducto. "ventasPorTipo" y "margenPorTipo", en cambio,
+  // SIEMPRE se calculan sobre el periodo completo (sin aplicar tipoFiltro),
+  // porque son justamente los números que alimentan las tarjetas
+  // Público/Taller que actúan como botones del filtro — si se filtraran a
+  // sí mismas, la tarjeta no seleccionada siempre mostraría $0.
+  function calcularAgregadosPeriodo(desdeStr, hastaStr, tipoFiltro) {
     const resumenDias = {};      // fecha -> subtotal
     const margenPorDia = {};     // fecha -> margen
     let margenTotal = 0;
     const ventasPorTipo = { Publico: 0, Taller: 0, "—": 0 };
+    const margenPorTipo = { Publico: 0, Taller: 0, "—": 0 };
     const porProducto = new Map(); // codigo -> { nombre (último visto, de respaldo), cantidad, subtotal }
 
     (historialRowsCache || []).forEach(r => {
@@ -5286,10 +5305,20 @@ function parseFechaSheet(val) {
       const margen = Number(r[8]) || 0;
       const tipoVenta = r[12] === "Publico" || r[12] === "Taller" ? r[12] : "—";
 
+      // Estas dos SIEMPRE se acumulan (ver comentario arriba de la función):
+      // alimentan las tarjetas Público/Taller, que deben mostrar el total
+      // real del periodo sin importar cuál esté seleccionada como filtro.
+      ventasPorTipo[tipoVenta] += subtotal;
+      margenPorTipo[tipoVenta] += margen;
+
+      // 🆕 Filtro global por tarjeta Público/Taller: si hay uno activo, todo
+      // lo demás (KPIs generales, gráficos, top de productos) solo
+      // considera las filas de ese tipo de venta.
+      if (tipoFiltro && tipoVenta !== tipoFiltro) return;
+
       resumenDias[fechaDia] = (resumenDias[fechaDia] || 0) + subtotal;
       margenPorDia[fechaDia] = (margenPorDia[fechaDia] || 0) + margen;
       margenTotal += margen;
-      ventasPorTipo[tipoVenta] += subtotal;
 
       // 🆕 Además de cantidad y subtotal, ahora se acumula por producto:
       // el margen ($) y el $ vendido desglosado por tarifa (Público /
@@ -5307,7 +5336,7 @@ function parseFechaSheet(val) {
       if (tipoVenta === "Taller") p.taller += subtotal;
     });
 
-    return { resumenDias, margenPorDia, margenTotal, ventasPorTipo, porProducto };
+    return { resumenDias, margenPorDia, margenTotal, ventasPorTipo, margenPorTipo, porProducto };
   }
 
   // 🗂️ Instancias activas de Chart.js, para poder destruirlas antes de
@@ -5321,16 +5350,27 @@ function parseFechaSheet(val) {
     }
   }
 
-  function renderChartBarras(canvasId, labels, data, label) {
+  // 🆕 onBarClick(index) opcional: si se pasa, el gráfico queda clicable y,
+  // al hacer clic en una barra, se llama con el índice de esa barra dentro
+  // de "labels" (se usa en "Ventas por día" para filtrar el dashboard a
+  // ese día exacto).
+  function renderChartBarras(canvasId, labels, data, label, onBarClick) {
     destruirChartSiExiste(canvasId);
-    const ctx = document.getElementById(canvasId).getContext("2d");
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext("2d");
     dashboardCharts[canvasId] = new Chart(ctx, {
       type: "bar",
       data: { labels, datasets: [{ label, data, backgroundColor: "#00b09b", borderRadius: 4 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+        scales: { y: { beginAtZero: true } },
+        onClick: onBarClick ? (evt, elementos) => {
+          if (elementos && elementos.length) onBarClick(elementos[0].index);
+        } : undefined,
+        onHover: onBarClick ? (evt, elementos) => {
+          evt.native.target.style.cursor = elementos.length ? "pointer" : "default";
+        } : undefined
       }
     });
   }
@@ -5365,6 +5405,42 @@ function parseFechaSheet(val) {
     });
   }
 
+  // 🆕 Filtro global de tipo de venta (Publico/Taller), activado desde las
+  // tarjetas del dashboard. null = sin filtro (se ve todo).
+  let dashboardFiltroTipo = null;
+
+  function toggleFiltroTipoVenta(tipo) {
+    dashboardFiltroTipo = (dashboardFiltroTipo === tipo) ? null : tipo;
+    renderDashboard();
+  }
+
+  // 🆕 Filtro global por día, activado al hacer clic en una barra del
+  // gráfico "Ventas por día". Reutiliza los mismos inputs Desde/Hasta que
+  // ya usan los botones "Filtrar"/"Ver todo", fijándolos los dos al mismo
+  // día para acotar todo el dashboard a esa fecha exacta.
+  function filtrarPorDia(fechaISO) {
+    document.getElementById("dashboardDesde").value = fechaISO;
+    document.getElementById("dashboardHasta").value = fechaISO;
+    renderDashboard();
+  }
+
+  // 🆕 Restaura el rango de fechas por defecto (inicio del mes actual hasta
+  // hoy) — a diferencia de "Ver todo" (limpiarFiltroDashboard), que borra
+  // las fechas por completo. Se usa en el botón "Quitar día" del indicador
+  // de filtro activo, para volver a la vista normal en vez de a "todo".
+  function quitarFiltroDia() {
+    const hoy = new Date();
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    document.getElementById("dashboardHasta").value = formatFechaISO(hoy);
+    document.getElementById("dashboardDesde").value = formatFechaISO(inicioMes);
+    renderDashboard();
+  }
+
+  function quitarFiltroTipoVenta() {
+    dashboardFiltroTipo = null;
+    renderDashboard();
+  }
+
   async function verDashboard() {
     if (typeof Chart === "undefined") {
       alert("❌ No se pudo cargar la librería de gráficos (Chart.js). Revisa tu conexión a internet e intenta de nuevo.");
@@ -5381,6 +5457,7 @@ function parseFechaSheet(val) {
 
       document.getElementById("dashboardHasta").value = formatFechaISO(hoy);
       document.getElementById("dashboardDesde").value = formatFechaISO(inicioMes);
+      dashboardFiltroTipo = null;
 
       renderDashboard();
       document.getElementById("dashboardModal").style.display = "flex";
@@ -5397,23 +5474,55 @@ function parseFechaSheet(val) {
     const desde = document.getElementById("dashboardDesde").value;
     const hasta = document.getElementById("dashboardHasta").value;
 
-    const { resumenDias, margenPorDia, margenTotal, ventasPorTipo, porProducto } = calcularAgregadosPeriodo(desde, hasta);
+    const { resumenDias, margenPorDia, margenTotal, ventasPorTipo, margenPorTipo, porProducto } = calcularAgregadosPeriodo(desde, hasta, dashboardFiltroTipo);
     const totalGeneral = Object.values(resumenDias).reduce((s, v) => s + v, 0);
     const margenPorcentajeTotal = totalGeneral > 0 ? (margenTotal / totalGeneral * 100) : 0;
 
+    // --- Indicador de filtros activos (tipo de venta / día) ---
+    let filtroHTML = "";
+    const esFiltroDia = desde && hasta && desde === hasta;
+    if (dashboardFiltroTipo || esFiltroDia) {
+      filtroHTML += `<div class="dash-filtro-activo">`;
+      filtroHTML += `🔎 Mostrando:`;
+      if (dashboardFiltroTipo) filtroHTML += ` <b>${dashboardFiltroTipo === "Publico" ? "Público" : "Taller"}</b>`;
+      if (esFiltroDia) filtroHTML += ` ${dashboardFiltroTipo ? "·" : ""} día <b>${desde}</b>`;
+      if (dashboardFiltroTipo) filtroHTML += ` <button onclick="quitarFiltroTipoVenta()">Quitar tipo</button>`;
+      if (esFiltroDia) filtroHTML += ` <button onclick="quitarFiltroDia()">Quitar día</button>`;
+      filtroHTML += `</div>`;
+    }
+    document.getElementById("dashboardFiltroActivo").innerHTML = filtroHTML;
+
     // --- KPIs ---
+    // 🆕 Las tarjetas Público/Taller ahora son clicables: actúan como
+    // filtro global del dashboard (reemplazan las opciones "Ventas a
+    // Público $" / "Ventas a Taller $" que antes vivían en el selector
+    // "Ordenar por" del top de productos). También muestran el % de
+    // ganancia (margen / vendido) de cada tarifa.
+    const pctMargenPublico = ventasPorTipo.Publico > 0 ? (margenPorTipo.Publico / ventasPorTipo.Publico * 100) : 0;
+    const pctMargenTaller = ventasPorTipo.Taller > 0 ? (margenPorTipo.Taller / ventasPorTipo.Taller * 100) : 0;
+
     let kpiHTML = "";
     kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">🧮 Total del periodo</div><div class="dash-kpi-value">${formatCurrency(totalGeneral)}</div></div>`;
     kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">💵 Margen total</div><div class="dash-kpi-value">${formatCurrency(margenTotal)}</div><div class="dash-kpi-sub">${margenPorcentajeTotal.toFixed(1)}%</div></div>`;
-    kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">🏷️ Público</div><div class="dash-kpi-value">${formatCurrency(ventasPorTipo.Publico)}</div></div>`;
-    kpiHTML += `<div class="dash-kpi"><div class="dash-kpi-label">🔧 Taller</div><div class="dash-kpi-value">${formatCurrency(ventasPorTipo.Taller)}</div></div>`;
+    kpiHTML += `<div class="dash-kpi dash-kpi-clickable ${dashboardFiltroTipo === "Publico" ? "dash-kpi-active" : ""}" onclick="toggleFiltroTipoVenta('Publico')">
+        <div class="dash-kpi-label">🏷️ Público</div>
+        <div class="dash-kpi-value">${formatCurrency(ventasPorTipo.Publico)}</div>
+        <div class="dash-kpi-sub">${pctMargenPublico.toFixed(1)}% ganancia</div>
+        <div class="dash-kpi-hint">${dashboardFiltroTipo === "Publico" ? "✓ filtrando" : "toca para filtrar"}</div>
+      </div>`;
+    kpiHTML += `<div class="dash-kpi dash-kpi-clickable ${dashboardFiltroTipo === "Taller" ? "dash-kpi-active" : ""}" onclick="toggleFiltroTipoVenta('Taller')">
+        <div class="dash-kpi-label">🔧 Taller</div>
+        <div class="dash-kpi-value">${formatCurrency(ventasPorTipo.Taller)}</div>
+        <div class="dash-kpi-sub">${pctMargenTaller.toFixed(1)}% ganancia</div>
+        <div class="dash-kpi-hint">${dashboardFiltroTipo === "Taller" ? "✓ filtrando" : "toca para filtrar"}</div>
+      </div>`;
     document.getElementById("dashboardKpis").innerHTML = kpiHTML;
 
     // --- Comparativo con el periodo anterior (mismo cálculo de siempre) ---
     const periodoAnterior = calcularPeriodoAnterior(desde, hasta);
     let compHTML = "";
     if (periodoAnterior) {
-      const resumenAnterior = calcularResumenRango(periodoAnterior.desde, periodoAnterior.hasta);
+      const resumenAnterior = calcularResumenRango(periodoAnterior.desde, periodoAnterior.hasta, dashboardFiltroTipo);
       compHTML += `<div class="dash-comparativo">`;
       compHTML += `<div style="font-size:12px; color:#666; margin-bottom:6px;">📊 Comparado con el periodo anterior (${periodoAnterior.desde} a ${periodoAnterior.hasta}):</div>`;
       compHTML += `<div style="font-size:13px; margin-bottom:2px;">🧮 Total: ${formatCurrency(resumenAnterior.total)} → ${formatCambioPorcentual(totalGeneral, resumenAnterior.total)}</div>`;
@@ -5434,7 +5543,10 @@ function parseFechaSheet(val) {
       // dejar el último gráfico dibujado con datos de otro periodo.
       ["chartVentasDia", "chartPublicoTaller", "chartMargenDia"].forEach(destruirChartSiExiste);
     } else {
-      renderChartBarras("chartVentasDia", fechasOrdenadas, fechasOrdenadas.map(f => resumenDias[f]), "Ventas ($)");
+      renderChartBarras(
+        "chartVentasDia", fechasOrdenadas, fechasOrdenadas.map(f => resumenDias[f]), "Ventas ($)",
+        (index) => filtrarPorDia(fechasOrdenadas[index])
+      );
       renderChartDonut("chartPublicoTaller", ["Público", "Taller"], [ventasPorTipo.Publico, ventasPorTipo.Taller]);
       const margenPctPorDia = fechasOrdenadas.map(f => resumenDias[f] > 0 ? (margenPorDia[f] / resumenDias[f] * 100) : 0);
       renderChartLinea("chartMargenDia", fechasOrdenadas, margenPctPorDia, "Margen %");
@@ -5483,13 +5595,37 @@ function parseFechaSheet(val) {
   // directamente desde el onchange del selector (sin recalcular nada más
   // del dashboard).
   function renderTopProductosTabla() {
-    const criterio = document.getElementById("dashboardTopOrden")?.value || "subtotal";
+    const selectOrden = document.getElementById("dashboardTopOrden");
+    const criterio = selectOrden?.value || "subtotal";
 
-    const topProductos = [...dashboardTopProductosCache]
-      .sort((a, b) => (b[criterio] || 0) - (a[criterio] || 0))
-      .slice(0, 10);
+    // 🆕 Regla 80/20 (Pareto): en vez de un "top 10" fijo, se ordenan los
+    // productos de mayor a menor según el criterio elegido ("categoría" del
+    // selector: Total $, Unidades o Margen $) y se van acumulando hasta
+    // juntar el 80% real del total de esa columna. Eso suele rondar el 20%
+    // de los productos, pero el número exacto depende de qué tan pareja
+    // esté repartida la venta — por eso no se fuerza un 20% exacto.
+    const ordenados = [...dashboardTopProductosCache].sort((a, b) => (b[criterio] || 0) - (a[criterio] || 0));
+    const totalCriterio = ordenados.reduce((s, p) => s + Math.max(p[criterio] || 0, 0), 0);
 
-    let topHTML = `<table class="dash-top-table"><thead><tr>
+    const topProductos = [];
+    if (totalCriterio > 0) {
+      let acumulado = 0;
+      for (const p of ordenados) {
+        topProductos.push(p);
+        acumulado += Math.max(p[criterio] || 0, 0);
+        if (acumulado / totalCriterio >= 0.8) break;
+      }
+    }
+
+    let topHTML = "";
+    if (ordenados.length > 0) {
+      const pctProductos = (topProductos.length / ordenados.length * 100).toFixed(0);
+      const nombreCriterio = selectOrden?.selectedOptions?.[0]?.text || "Total $ vendido";
+      topHTML += `<div style="font-size:12px;color:#666;margin-bottom:6px;">
+        Mostrando ${topProductos.length} de ${ordenados.length} productos (${pctProductos}%), que juntos generan el 80% de "${nombreCriterio}".
+      </div>`;
+    }
+    topHTML += `<table class="dash-top-table"><thead><tr>
       <th>Código</th><th>Producto</th><th>Unidades</th>
       <th>Margen $</th><th>Público $</th><th>Taller $</th><th>Total $</th>
     </tr></thead><tbody>`;
@@ -5523,6 +5659,7 @@ function parseFechaSheet(val) {
   function limpiarFiltroDashboard() {
     document.getElementById("dashboardDesde").value = "";
     document.getElementById("dashboardHasta").value = "";
+    dashboardFiltroTipo = null;
     renderDashboard();
   }
 

@@ -643,6 +643,14 @@
   .inv-bajo-row.ya-pedido .inv-info strong { text-decoration: line-through; }
 
   #historialModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #talleresModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+  #talleresContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 640px; max-height: 85vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
+  #talleresListado table, #tallerDetalleTabla { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  #talleresListado th, #tallerDetalleTabla th { background: #007bff; color: white; padding: 6px 8px; text-align: left; }
+  #talleresListado td, #tallerDetalleTabla td { border: 1px solid #ddd; padding: 6px 8px; }
+  #talleresListado tr:nth-child(even), #tallerDetalleTabla tr:nth-child(even) { background: #f9f9f9; }
+  .taller-saldo-positivo { color: #28a745; font-weight: bold; }
+  .taller-saldo-cero { color: #999; }
   #historialContent { background: #fff; padding: 20px; border-radius: 12px; width: 95%; max-width: 700px; max-height: 80vh; overflow-y: auto; animation: fadeIn 0.3s ease; }
   #historialTable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
   #historialTable th { background: #007bff; color: white; padding: 8px; }
@@ -1361,6 +1369,10 @@ body.admin-logged-in .admin-only {
     <button class="icon-btn" id="pedidoFloatBtn" data-tooltip="Agregar faltante" onclick="abrirModalPedido()" aria-label="Agregar faltante">📝</button>
     <span class="tool-bar-label">Faltante</span>
   </div>
+  <div class="tool-bar-item admin-only">
+    <button class="icon-btn" data-tooltip="Saldo por taller" onclick="abrirSaldosTalleres()" aria-label="Saldo por taller">🔧</button>
+    <span class="tool-bar-label">Talleres</span>
+  </div>
 </div>
 <div class="float-actions">
   <div id="adminLoginBtn" class="float-btn" onclick="abrirLoginAdmin()" data-tooltip="Acceso administrador" aria-label="Acceso administrador" role="button" tabindex="0">🔐</div>
@@ -1433,7 +1445,26 @@ body.admin-logged-in .admin-only {
         <input id="clienteTel" placeholder="Teléfono" style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; min-width: 0;">
       </div>
       <div id="clienteSugerencias" class="cliente-sugerencias"></div>
-    
+
+      <!-- 🔧 NUEVO: taller que refiere al cliente. Si se llena, la venta
+           se sigue cobrando a precio público (como siempre), pero la
+           diferencia con el precio taller se acumula a favor de este
+           taller. Debe ser una persona ya registrada (se exige elegirla
+           de las sugerencias, que solo aparecen si hay coincidencia; el
+           texto libre sin seleccionar NO se manda al backend). -->
+      <div style="position: relative; margin-top: 8px; border-top: 1px dashed #ddd; padding-top: 8px;">
+        <label style="font-size: 12px; color: #555; display:block; margin-bottom: 4px;">🔧 Taller que refiere (opcional)</label>
+        <input id="tallerNombre" placeholder="Nombre del taller (persona registrada)" autocomplete="off"
+          oninput="buscarTallerSugerencias()" onfocus="buscarTallerSugerencias()"
+          style="width: 100%; margin-bottom: 4px; padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box;">
+        <div id="tallerSugerencias" class="cliente-sugerencias"></div>
+        <div id="tallerSeleccionadoInfo" style="display:none; font-size: 12px; color: #28a745; margin-top: 2px;">
+          ✅ Taller asignado: <strong id="tallerSeleccionadoNombre"></strong>
+          <button type="button" onclick="quitarTallerAsignado()" style="margin-left:6px; border:none; background:#eee; border-radius:4px; padding:1px 6px; cursor:pointer; font-size:11px;">quitar</button>
+        </div>
+        <div style="font-size: 11px; color: #999; margin-top: 2px;">Debes elegir un taller de la lista (persona ya registrada); no se acepta texto libre.</div>
+      </div>
+
     </div>
   </details>
   <!-- La forma de pago es obligatoria para CUALQUIER venta, así que se
@@ -1640,6 +1671,36 @@ body.admin-logged-in .admin-only {
       </label>
     </div>
     <div id="dashboardTopProductos"></div>
+  </div>
+</div>
+
+<!-- 🔧 NUEVO: Saldo por taller (diferencia público/taller acumulada a su favor) -->
+<div id="talleresModal">
+  <div id="talleresContent">
+    <button class="close-historial" onclick="document.getElementById('talleresModal').style.display='none'">✖ Cerrar</button>
+    <h3>🔧 Saldo por taller</h3>
+
+    <!-- Vista 1: listado de todos los talleres con saldo -->
+    <div id="talleresListadoView">
+      <div id="talleresListado">Cargando…</div>
+    </div>
+
+    <!-- Vista 2: detalle de un taller (oculta hasta que se elija uno) -->
+    <div id="tallerDetalleView" style="display:none;">
+      <button onclick="volverAListadoTalleres()" style="margin-bottom:8px;">⬅ Volver al listado</button>
+      <h4 id="tallerDetalleTitulo"></h4>
+
+      <div style="display:flex; gap:6px; align-items:center; margin:10px 0; padding:10px; background:#f8f9fa; border-radius:8px;">
+        <label style="font-size:13px; flex:1;">Registrar pago/liquidación:</label>
+        <input id="tallerPagoMonto" type="number" min="1" placeholder="$" style="width:120px; padding:4px 8px; border-radius:6px; border:1px solid #ccc;">
+        <button onclick="registrarPagoTallerUI()" style="padding:5px 10px; border:none; border-radius:6px; background:linear-gradient(90deg,#00b09b,#96c93d); color:#fff; cursor:pointer;">Pagar</button>
+      </div>
+
+      <table id="tallerDetalleTabla">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th>Monto</th><th>Saldo</th></tr></thead>
+        <tbody id="tallerDetalleBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -4807,6 +4868,70 @@ function mostrarSugerencias(code) {
     setTimeout(() => document.getElementById("clienteSugerencias").classList.remove("visible"), 150);
   });
 
+  // 🔧 NUEVO: taller referente. Solo se acepta un taller elegido de la
+  // lista de personas ya registradas ("Clientes"); mientras no se elija
+  // una sugerencia, "tallerAsignadoActual" queda en null y el checkout
+  // no manda ningún taller, aunque el input tenga texto escrito.
+  let tallerAsignadoActual = null;
+
+  async function buscarTallerSugerencias() {
+    const nombreVal = document.getElementById("tallerNombre").value.trim().toLowerCase();
+    const cont = document.getElementById("tallerSugerencias");
+
+    // Si el texto cambió, la selección anterior ya no es válida hasta
+    // que se vuelva a elegir explícitamente de la lista.
+    if (tallerAsignadoActual && tallerAsignadoActual.nombre.toLowerCase() !== nombreVal) {
+      tallerAsignadoActual = null;
+      document.getElementById("tallerSeleccionadoInfo").style.display = "none";
+    }
+
+    if (!nombreVal) {
+      cont.classList.remove("visible");
+      return;
+    }
+
+    const clientes = await obtenerClientesCache();
+    const coincidencias = clientes.filter(c =>
+      c.nombre.toLowerCase().includes(nombreVal) || c.cedula.toLowerCase().includes(nombreVal)
+    ).slice(0, 6);
+
+    if (coincidencias.length === 0) {
+      cont.classList.remove("visible");
+      cont.innerHTML = "";
+      return;
+    }
+
+    cont.innerHTML = coincidencias.map(c => `
+      <div class="cliente-sugerencia-item" onmousedown="seleccionarTallerSugerido('${c.cedula.replace(/'/g, "&apos;")}')">
+        <strong>${c.nombre || "(sin nombre)"}</strong>
+        <span>${c.cedula || "sin cédula"}${c.telefono ? " · " + c.telefono : ""}</span>
+      </div>
+    `).join("");
+    cont.classList.add("visible");
+  }
+
+  async function seleccionarTallerSugerido(cedula) {
+    const clientes = await obtenerClientesCache();
+    const c = clientes.find(x => x.cedula === cedula);
+    if (!c) return;
+    tallerAsignadoActual = { nombre: c.nombre || "", cedula: c.cedula || "" };
+    document.getElementById("tallerNombre").value = c.nombre || "";
+    document.getElementById("tallerSugerencias").classList.remove("visible");
+    document.getElementById("tallerSeleccionadoInfo").style.display = "block";
+    document.getElementById("tallerSeleccionadoNombre").textContent = `${c.nombre} (${c.cedula})`;
+  }
+
+  function quitarTallerAsignado() {
+    tallerAsignadoActual = null;
+    document.getElementById("tallerNombre").value = "";
+    document.getElementById("tallerSeleccionadoInfo").style.display = "none";
+    document.getElementById("tallerSugerencias").classList.remove("visible");
+  }
+
+  document.getElementById("tallerNombre").addEventListener("blur", () => {
+    setTimeout(() => document.getElementById("tallerSugerencias").classList.remove("visible"), 150);
+  });
+
 
   // ===== Desplegables del carrito =====
   function configurarDesplegableCarrito(id) {
@@ -4847,6 +4972,24 @@ function mostrarSugerencias(code) {
   if (!formaPagoInput.value) {
     showToast("⚠️ Selecciona una forma de pago para poder finalizar la venta.");
     formaPagoInput.focus();
+    return;
+  }
+
+  // 🔧 NUEVO: si se escribió algo en "Taller que refiere" pero no se
+  // seleccionó ninguna sugerencia registrada, no se deja avanzar (el
+  // taller SIEMPRE debe ser una persona ya registrada, nunca texto libre).
+  const tallerNombreInput = document.getElementById("tallerNombre").value.trim();
+  if (tallerNombreInput && !tallerAsignadoActual) {
+    alert("⚠️ El taller referente debe elegirse de la lista de sugerencias (persona ya registrada). Selecciónalo o borra el campo.");
+    document.getElementById("tallerNombre").focus();
+    return;
+  }
+
+  // 🔧 NUEVO: si hay un taller asignado, ningún ítem del carrito puede
+  // estar cargado a tarifa "taller" — la venta se cobra siempre a precio
+  // público, y es esa diferencia la que se acumula a favor del taller.
+  if (tallerAsignadoActual && cart.some(i => i.tarifa === "taller")) {
+    alert("⚠️ Con un taller referente asignado, todos los productos deben estar a precio PÚBLICO en el carrito (la diferencia se acumula a favor del taller). Revisa la tarifa de los productos del carrito.");
     return;
   }
 
@@ -4892,6 +5035,11 @@ function mostrarSugerencias(code) {
         cedula: clienteDoc,
         telefono: clienteTel
       },
+      // 🔧 NUEVO: taller referente (persona registrada) — null si no se
+      // asignó ninguno a esta venta. El backend calcula y acumula, a
+      // favor de este taller, la diferencia entre el precio público
+      // cobrado y el precio taller de catálogo de cada producto.
+      taller: tallerAsignadoActual,
       items: cart.map(i => ({
         code: i.code,
         name: i.name,
@@ -4988,6 +5136,7 @@ function mostrarSugerencias(code) {
     document.getElementById("clienteNombre").value = "";
     document.getElementById("clienteDoc").value = "";
     document.getElementById("clienteTel").value = "";
+    quitarTallerAsignado(); // 🔧 la venta ya quedó registrada con este taller; la próxima empieza sin ninguno
     guardarCarritoEnStorage(); // el .value="" de arriba no dispara el evento "input", así que se guarda a mano
     document.getElementById("clienteSugerencias").classList.remove("visible");
     clientesCacheTime = 0; // fuerza a releer "Clientes" en la próxima búsqueda (por si se guardó/actualizó uno nuevo)
@@ -5140,6 +5289,133 @@ function parseFechaSheet(val) {
         return (c.f !== undefined && c.f !== null) ? c.f : (c.v ?? "");
       })
     );
+  }
+
+  // ==========================================
+  // 🔧 NUEVO: Saldo por taller
+  // ==========================================
+  let talleresCacheSaldos = null;
+
+  async function abrirSaldosTalleres() {
+    document.getElementById("talleresModal").style.display = "flex";
+    document.getElementById("tallerDetalleView").style.display = "none";
+    document.getElementById("talleresListadoView").style.display = "block";
+    await cargarYRenderListadoTalleres();
+  }
+
+  async function cargarYRenderListadoTalleres() {
+    const cont = document.getElementById("talleresListado");
+    cont.innerHTML = "Cargando…";
+    try {
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=saldosTalleres&apiKey=${encodeURIComponent(WEBAPP_API_KEY)}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error("Respuesta inválida del servidor");
+      talleresCacheSaldos = json.talleres || [];
+
+      if (talleresCacheSaldos.length === 0) {
+        cont.innerHTML = "<p>Todavía no hay talleres con movimientos.</p>";
+        return;
+      }
+
+      cont.innerHTML = `
+        <table>
+          <thead><tr><th>Taller</th><th>Cédula</th><th>Saldo a favor</th><th></th></tr></thead>
+          <tbody>
+            ${talleresCacheSaldos.map(t => `
+              <tr>
+                <td>${t.nombre || "(sin nombre)"}</td>
+                <td>${t.cedula}</td>
+                <td class="${t.saldo > 0 ? 'taller-saldo-positivo' : 'taller-saldo-cero'}">$${Math.round(t.saldo).toLocaleString('es-CO')}</td>
+                <td><button onclick="verDetalleTaller('${t.cedula.replace(/'/g, "&apos;")}')">Ver detalle</button></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    } catch (e) {
+      cont.innerHTML = "<p>⚠️ No se pudo cargar el listado de talleres. Intenta de nuevo.</p>";
+      console.error("Error cargando saldos de talleres:", e);
+    }
+  }
+
+  async function verDetalleTaller(cedula) {
+    const taller = (talleresCacheSaldos || []).find(t => t.cedula === cedula);
+    if (!taller) return;
+
+    document.getElementById("talleresListadoView").style.display = "none";
+    document.getElementById("tallerDetalleView").style.display = "block";
+    document.getElementById("tallerDetalleView").dataset.cedula = cedula;
+    document.getElementById("tallerDetalleView").dataset.nombre = taller.nombre || "";
+    document.getElementById("tallerDetalleTitulo").textContent =
+      `${taller.nombre || "(sin nombre)"} — Saldo actual: $${Math.round(taller.saldo).toLocaleString('es-CO')}`;
+
+    const body = document.getElementById("tallerDetalleBody");
+    body.innerHTML = "<tr><td colspan='5'>Cargando…</td></tr>";
+    try {
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=movimientosTaller&cedula=${encodeURIComponent(cedula)}&apiKey=${encodeURIComponent(WEBAPP_API_KEY)}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error("Respuesta inválida");
+      const movimientos = json.movimientos || [];
+
+      body.innerHTML = movimientos.length === 0
+        ? "<tr><td colspan='5'>Sin movimientos.</td></tr>"
+        : movimientos.map(m => `
+            <tr>
+              <td>${m.fecha}</td>
+              <td>${m.tipo}</td>
+              <td>${m.referencia || "—"}</td>
+              <td style="color:${m.monto < 0 ? '#dc3545' : '#28a745'};">${m.monto < 0 ? '-' : '+'}$${Math.abs(Math.round(m.monto)).toLocaleString('es-CO')}</td>
+              <td>$${Math.round(m.saldoResultante).toLocaleString('es-CO')}</td>
+            </tr>
+          `).join("");
+    } catch (e) {
+      body.innerHTML = "<tr><td colspan='5'>⚠️ No se pudo cargar el historial.</td></tr>";
+      console.error("Error cargando movimientos del taller:", e);
+    }
+  }
+
+  function volverAListadoTalleres() {
+    document.getElementById("tallerDetalleView").style.display = "none";
+    document.getElementById("talleresListadoView").style.display = "block";
+  }
+
+  async function registrarPagoTallerUI() {
+    const detalleDiv = document.getElementById("tallerDetalleView");
+    const cedula = detalleDiv.dataset.cedula;
+    const nombre = detalleDiv.dataset.nombre;
+    const monto = parseFloat(document.getElementById("tallerPagoMonto").value);
+
+    if (!monto || monto <= 0) {
+      alert("⚠️ Ingresa un monto válido a pagar.");
+      return;
+    }
+    if (!confirm(`¿Confirmar pago de $${Math.round(monto).toLocaleString('es-CO')} a ${nombre}?`)) return;
+
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          apiKey: WEBAPP_API_KEY,
+          action: "registrarPagoTaller",
+          transaccionId: (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+          taller: { nombre, cedula },
+          monto
+        })
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        alert("❌ No se pudo registrar el pago:\n" + (json.error || "Error desconocido."));
+        return;
+      }
+      showToast("✅ Pago registrado.");
+      document.getElementById("tallerPagoMonto").value = "";
+      await cargarYRenderListadoTalleres();
+      await verDetalleTaller(cedula);
+    } catch (e) {
+      alert("❌ Error de red registrando el pago. Intenta de nuevo.");
+      console.error(e);
+    }
   }
 
   async function verHistorial() {

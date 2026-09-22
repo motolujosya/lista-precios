@@ -1406,6 +1406,21 @@ body.admin-logged-in .admin-only {
     <span>Descuento:</span><span id="cartDiscountAmount">-$0</span>
   </div>
   <div class="cart-total"><strong>Total:</strong> <span id="cartTotal">$0</span></div>
+
+  <!-- 🔁 NUEVO: cambia la tarifa de TODOS los productos que ya están en
+       el carrito (útil para cotizaciones: armas el carrito y decides
+       después si se lo das a público o a precio taller, sin borrar y
+       volver a agregar cada producto). NO afecta el catálogo, solo lo
+       que ya está en el carrito. -->
+  <div class="admin-only-block">
+    <div style="display: flex; gap: 6px; margin: 8px 0;">
+      <button id="carritoATodoPublicoBtn" title="Cambiar todos los productos del carrito a precio público"
+        style="flex:1; padding: 6px 4px; border: none; border-radius: 6px; background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; cursor: pointer; font-size: 12px;">🏢 Carrito a Público</button>
+      <button id="carritoATodoTallerBtn" title="Cambiar todos los productos del carrito a precio taller"
+        style="flex:1; padding: 6px 4px; border: none; border-radius: 6px; background: linear-gradient(90deg, #ff9800, #ff5722); color: #fff; cursor: pointer; font-size: 12px;">🔧 Carrito a Taller</button>
+    </div>
+  </div>
+
   <!-- Ajustar total del carrito: por porcentaje de descuento o valor manual -->
   <details id="descuentoCarrito" class="admin-only-block cart-collapsible">
     <summary>💲 Ajustar total del carrito</summary>
@@ -1840,6 +1855,7 @@ body.admin-logged-in .admin-only {
   
 
   let cart = [];
+
   // 🔐 NUEVO: ID único del intento de venta actual. Se genera la PRIMERA
   // vez que se manda la venta al servidor, y se REUTILIZA si el mismo
   // carrito se reintenta (por ejemplo, tras un error de conexión) — así
@@ -2888,6 +2904,72 @@ function buildProductLabel(code, name, info) {
   return [code, name, info].filter(Boolean).join(" ");
 }
 
+// 🔁 NUEVO: cambia la tarifa de TODOS los productos que YA están en el
+// carrito, de una sola vez — pensado para cotizaciones: armas el carrito
+// y después decides si se lo das a precio público o a precio taller,
+// sin borrar y volver a agregar cada producto. Esto NO toca el catálogo
+// (los "add-btn" de cada tarjeta siguen funcionando igual que siempre).
+//
+// destino: "publico" o "taller".
+// Si algún producto del carrito no tiene precio taller definido en el
+// catálogo, se deja en público (no hay nada válido para pasarlo a
+// taller) y se avisa cuál quedó así.
+function cambiarTarifaCarrito(destino) {
+  if (cart.length === 0) {
+    showToast("⚠️ El carrito está vacío.");
+    return;
+  }
+
+  let cambiados = 0;
+  const sinPrecioTaller = [];
+  const noEnCatalogo = [];
+
+  cart.forEach(item => {
+    const producto = productosData.find(p => p.code === item.code);
+    if (!producto) {
+      // El producto ya no existe en el catálogo actual: se deja tal cual
+      // (no hay de dónde sacar el precio "oficial" público ni taller).
+      noEnCatalogo.push(item.label || item.name);
+      return;
+    }
+
+    if (destino === "taller") {
+      const precioTaller = parseFloat(producto.priceDesc);
+      const tienePrecioTallerValido = !isNaN(precioTaller) && precioTaller > 0;
+      if (!tienePrecioTallerValido) {
+        sinPrecioTaller.push(item.label || item.name);
+        return; // se deja en público, no se toca
+      }
+      if (item.tarifa !== "taller" || parseFloat(item.price) !== precioTaller) cambiados++;
+      item.price = precioTaller;
+      item.tarifa = "taller";
+    } else {
+      const precioPublico = parseFloat(producto.price) || 0;
+      if (item.tarifa !== "publico" || parseFloat(item.price) !== precioPublico) cambiados++;
+      item.price = precioPublico;
+      item.tarifa = "publico";
+    }
+  });
+
+  updateCartDisplay();
+  guardarCarritoEnStorage();
+
+  const destinoTxt = destino === "taller" ? "TALLER" : "PÚBLICO";
+  let msg = cambiados > 0
+    ? `✅ ${cambiados} producto(s) del carrito cambiados a precio ${destinoTxt}.`
+    : `ℹ️ El carrito ya estaba en precio ${destinoTxt}.`;
+  if (sinPrecioTaller.length > 0) {
+    msg += ` ⚠️ Sin precio taller definido (quedaron en público): ${sinPrecioTaller.join(", ")}.`;
+  }
+  if (noEnCatalogo.length > 0) {
+    msg += ` ⚠️ No encontrados en el catálogo actual (no se tocaron): ${noEnCatalogo.join(", ")}.`;
+  }
+  showToast(msg);
+}
+
+document.getElementById("carritoATodoPublicoBtn").onclick = () => cambiarTarifaCarrito("publico");
+document.getElementById("carritoATodoTallerBtn").onclick = () => cambiarTarifaCarrito("taller");
+
 // 🔄 Sincroniza UN ítem del carrito con los datos más recientes del
 // catálogo (nombre, info, descripción y precio según la tarifa
 // público/taller que se había elegido). Devuelve true si cambió algo.
@@ -3252,7 +3334,11 @@ function mostrarSugerencias(code) {
   // 🔎 Buscar recibos guardados en la hoja "Recibos"
   function abrirBuscarRecibos() {
     document.getElementById("buscarRecibosModal").style.display = "flex";
-    document.getElementById("resultadosRecibos").innerHTML = `<p style="text-align:center; color:#888;">Usa los filtros y presiona "Buscar".</p>`;
+    // 🆕 Por defecto se abre con la fecha de HOY ya seleccionada y se
+    // busca automáticamente con ese filtro (antes quedaba vacío y había
+    // que escribir la fecha y darle "Buscar" a mano).
+    document.getElementById("filtroFecha").value = formatFechaISO(new Date());
+    buscarRecibos();
   }
 
   async function buscarRecibos() {
